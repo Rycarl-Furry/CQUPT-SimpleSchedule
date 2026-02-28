@@ -3,7 +3,8 @@ package com.example.myapplication.ui
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
-import android.view.Gravity
+import android.os.Handler
+import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -12,8 +13,10 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import com.example.myapplication.cache.CurriculumCache
 import com.example.myapplication.databinding.FragmentExamBinding
 import com.example.myapplication.model.Exam
+import com.example.myapplication.model.ExamResponse
 import com.example.myapplication.model.MakeupExam
 import com.example.myapplication.network.NetworkService
 import kotlinx.coroutines.launch
@@ -25,6 +28,10 @@ class ExamFragment : Fragment() {
     
     private val networkService = NetworkService()
     private var studentId: String? = null
+    private lateinit var cache: CurriculumCache
+    
+    private val retryHandler = Handler(Looper.getMainLooper())
+    private var retryRunnable: Runnable? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -38,6 +45,7 @@ class ExamFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        cache = CurriculumCache(requireContext())
         
         if (studentId != null) {
             loadExams(studentId!!)
@@ -47,9 +55,41 @@ class ExamFragment : Fragment() {
     }
 
     private fun loadExams(studentId: String) {
-        binding.progressBar.visibility = View.VISIBLE
-        binding.emptyView.visibility = View.GONE
-        binding.examContainer.removeAllViews()
+        val cachedData = cache.getExamCache(studentId)
+        
+        if (cachedData != null) {
+            displayExams(cachedData.exams, cachedData.makeup_exams)
+            refreshInBackground(studentId)
+        } else {
+            binding.progressBar.visibility = View.VISIBLE
+            binding.emptyView.visibility = View.GONE
+            fetchExamsWithRetry(studentId, showLoading = true)
+        }
+    }
+
+    private fun refreshInBackground(studentId: String) {
+        lifecycleScope.launch {
+            val result = networkService.fetchExams(studentId)
+            result.fold(
+                onSuccess = { response ->
+                    cache.saveExamCache(studentId, response)
+                    if (isDataDifferent(cache.getExamCache(studentId), response)) {
+                        binding.examContainer.removeAllViews()
+                        displayExams(response.exams, response.makeup_exams)
+                        Toast.makeText(requireContext(), "考试安排已更新", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                onFailure = {
+                    scheduleRetry(studentId, isBackgroundRefresh = true)
+                }
+            )
+        }
+    }
+
+    private fun fetchExamsWithRetry(studentId: String, showLoading: Boolean) {
+        if (showLoading) {
+            binding.progressBar.visibility = View.VISIBLE
+        }
         
         lifecycleScope.launch {
             val result = networkService.fetchExams(studentId)
@@ -57,6 +97,7 @@ class ExamFragment : Fragment() {
             
             result.fold(
                 onSuccess = { response ->
+                    cache.saveExamCache(studentId, response)
                     if (response.exams.isEmpty() && response.makeup_exams.isEmpty()) {
                         binding.emptyView.visibility = View.VISIBLE
                     } else {
@@ -64,18 +105,55 @@ class ExamFragment : Fragment() {
                     }
                 },
                 onFailure = { error ->
-                    Toast.makeText(
-                        requireContext(),
-                        "加载失败: ${error.message}",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                    binding.emptyView.visibility = View.VISIBLE
+                    val cachedData = cache.getExamCache(studentId)
+                    if (cachedData != null) {
+                        displayExams(cachedData.exams, cachedData.makeup_exams)
+                        Toast.makeText(
+                            requireContext(),
+                            "使用缓存数据，${error.message}",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    } else {
+                        Toast.makeText(
+                            requireContext(),
+                            "加载失败: ${error.message}",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        scheduleRetry(studentId, isBackgroundRefresh = false)
+                    }
+                    binding.emptyView.visibility = if (cachedData == null) View.VISIBLE else View.GONE
                 }
             )
         }
     }
 
+    private fun scheduleRetry(studentId: String, isBackgroundRefresh: Boolean) {
+        retryRunnable?.let { retryHandler.removeCallbacks(it) }
+        
+        retryRunnable = Runnable {
+            if (isAdded && studentId.isNotEmpty()) {
+                fetchExamsWithRetry(studentId, showLoading = !isBackgroundRefresh)
+            }
+        }
+        retryHandler.postDelayed(retryRunnable!!, 10000)
+    }
+
+    private fun isDataDifferent(old: ExamResponse?, new: ExamResponse): Boolean {
+        if (old == null) return true
+        if (old.exams.size != new.exams.size || old.makeup_exams.size != new.makeup_exams.size) return true
+        return false
+    }
+
     private fun displayExams(exams: List<Exam>, makeupExams: List<MakeupExam>) {
+        binding.examContainer.removeAllViews()
+        
+        if (exams.isEmpty() && makeupExams.isEmpty()) {
+            binding.emptyView.visibility = View.VISIBLE
+            return
+        }
+        
+        binding.emptyView.visibility = View.GONE
+        
         if (exams.isNotEmpty()) {
             val headerView = createSectionHeader("期末/半期考试")
             binding.examContainer.addView(headerView)
@@ -268,6 +346,7 @@ class ExamFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        retryRunnable?.let { retryHandler.removeCallbacks(it) }
         _binding = null
     }
 

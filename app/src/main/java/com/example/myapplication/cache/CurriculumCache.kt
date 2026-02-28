@@ -2,6 +2,7 @@ package com.example.myapplication.cache
 
 import android.content.Context
 import com.example.myapplication.model.CurriculumResponse
+import com.example.myapplication.model.ExamResponse
 import com.google.gson.Gson
 
 class CurriculumCache(private val context: Context) {
@@ -87,6 +88,27 @@ class CurriculumCache(private val context: Context) {
             .remove("ids_password")
             .putBoolean("auto_login_enabled", false)
             .apply()
+    }
+    
+    fun saveExamCache(studentId: String, data: ExamResponse) {
+        val json = gson.toJson(data)
+        prefs.edit()
+            .putString("exam_cache_$studentId", json)
+            .putLong("exam_time_$studentId", System.currentTimeMillis())
+            .apply()
+    }
+    
+    fun getExamCache(studentId: String): ExamResponse? {
+        val json = prefs.getString("exam_cache_$studentId", null) ?: return null
+        return try {
+            gson.fromJson(json, ExamResponse::class.java)
+        } catch (e: Exception) {
+            null
+        }
+    }
+    
+    fun hasExamCache(studentId: String): Boolean {
+        return prefs.contains("exam_cache_$studentId")
     }
     
     fun clear() {
