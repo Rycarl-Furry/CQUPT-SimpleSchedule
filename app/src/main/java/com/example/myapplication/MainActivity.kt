@@ -50,6 +50,25 @@ class MainActivity : AppCompatActivity() {
         if (fromCache && studentId != null) {
             refreshInBackground(studentId!!)
         }
+        
+        performAutoIdsLogin()
+    }
+
+    private fun performAutoIdsLogin() {
+        if (cache.isAutoLoginEnabled()) {
+            val credentials = cache.getAutoLoginCredentials()
+            if (credentials != null) {
+                lifecycleScope.launch {
+                    val result = networkService.login(credentials.first, credentials.second)
+                    result.fold(
+                        onSuccess = { response ->
+                            cache.saveAccessToken(response.access_token)
+                        },
+                        onFailure = { }
+                    )
+                }
+            }
+        }
     }
 
     private fun refreshInBackground(studentId: String) {

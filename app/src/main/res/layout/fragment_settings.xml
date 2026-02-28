@@ -141,7 +141,7 @@
                             android:id="@+id/tvCurrentVersion"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="v1.0.3"
+                            android:text="v1.0.4"
                             android:textSize="12sp"
                             android:textColor="#888888"
                             android:layout_marginEnd="8dp" />
@@ -230,7 +230,7 @@
         android:layout_height="wrap_content"
         android:layout_gravity="center_horizontal"
         android:layout_marginBottom="16dp"
-        android:text="SimpleSchedule v1.0.3"
+        android:text="SimpleSchedule v1.0.4"
         android:textSize="12sp"
         android:textColor="#888888" />
 

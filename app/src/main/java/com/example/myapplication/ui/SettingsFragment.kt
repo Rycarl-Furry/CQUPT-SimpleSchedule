@@ -25,7 +25,7 @@ class SettingsFragment : Fragment() {
     private val networkService = NetworkService()
     private lateinit var cache: CurriculumCache
     
-    private val currentVersion = "v1.0.3"
+    private val currentVersion = "v1.0.4"
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -85,7 +85,7 @@ class SettingsFragment : Fragment() {
             val password = dialogBinding.etPassword.text.toString().trim()
             
             if (username.isEmpty()) {
-                Toast.makeText(requireContext(), "请输入学号", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), "请输入统一认证码", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
             

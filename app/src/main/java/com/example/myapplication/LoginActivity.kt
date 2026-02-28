@@ -21,14 +21,6 @@ class LoginActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         cache = CurriculumCache(this)
         
-        if (cache.isAutoLoginEnabled()) {
-            val credentials = cache.getAutoLoginCredentials()
-            if (credentials != null) {
-                performAutoIdsLogin(credentials.first, credentials.second)
-                return
-            }
-        }
-        
         val lastLoginId = cache.getLastLogin()
         if (lastLoginId != null && cache.hasCache(lastLoginId)) {
             autoLogin(lastLoginId)
@@ -38,43 +30,9 @@ class LoginActivity : AppCompatActivity() {
         binding = ActivityLoginBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        binding.btnLogin.setOnClickListener {
-            val studentId = binding.etStudentId.text.toString().trim()
-            if (studentId.isEmpty()) {
-                Toast.makeText(this, "请输入学号", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            loadCurriculum(studentId)
-        }
-    }
-
-    private fun performAutoIdsLogin(username: String, password: String) {
-        lifecycleScope.launch {
-            val result = networkService.login(username, password)
-            result.fold(
-                onSuccess = { response ->
-                    cache.saveAccessToken(response.access_token)
-                    val lastLoginId = cache.getLastLogin()
-                    if (lastLoginId != null && cache.hasCache(lastLoginId)) {
-                        autoLogin(lastLoginId)
-                    } else {
-                        showLoginForm()
-                    }
-                },
-                onFailure = {
-                    showLoginForm()
-                }
-            )
-        }
-    }
-
-    private fun showLoginForm() {
-        binding = ActivityLoginBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-        
-        val lastLoginId = cache.getLastLogin()
-        if (lastLoginId != null) {
-            binding.etStudentId.setText(lastLoginId)
+        val lastId = cache.getLastLogin()
+        if (lastId != null) {
+            binding.etStudentId.setText(lastId)
         }
 
         binding.btnLogin.setOnClickListener {
@@ -100,6 +58,25 @@ class LoginActivity : AppCompatActivity() {
             finish()
         } else {
             showLoginForm()
+        }
+    }
+
+    private fun showLoginForm() {
+        binding = ActivityLoginBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        
+        val lastLoginId = cache.getLastLogin()
+        if (lastLoginId != null) {
+            binding.etStudentId.setText(lastLoginId)
+        }
+
+        binding.btnLogin.setOnClickListener {
+            val studentId = binding.etStudentId.text.toString().trim()
+            if (studentId.isEmpty()) {
+                Toast.makeText(this, "请输入学号", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            loadCurriculum(studentId)
         }
     }
 
