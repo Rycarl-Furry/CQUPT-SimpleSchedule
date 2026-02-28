@@ -1,5 +1,7 @@
 package com.example.myapplication.ui
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
@@ -52,6 +54,7 @@ class ScheduleFragment : Fragment() {
     private var touchStartX = 0f
     private var touchStartY = 0f
     private val swipeThreshold = 100f
+    private var isAnimating = false
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -75,18 +78,14 @@ class ScheduleFragment : Fragment() {
         }
 
         binding.btnPrevWeek.setOnClickListener {
-            if (currentWeek > 1) {
-                currentWeek--
-                updateWeekDisplay()
-                renderSchedule()
+            if (currentWeek > 1 && !isAnimating) {
+                animateWeekChange(false)
             }
         }
 
         binding.btnNextWeek.setOnClickListener {
-            if (currentWeek < maxWeek) {
-                currentWeek++
-                updateWeekDisplay()
-                renderSchedule()
+            if (currentWeek < maxWeek && !isAnimating) {
+                animateWeekChange(true)
             }
         }
 
@@ -96,6 +95,8 @@ class ScheduleFragment : Fragment() {
     }
 
     private fun handleSwipeGesture(event: MotionEvent): Boolean {
+        if (isAnimating) return false
+        
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
                 touchStartX = event.x
@@ -109,17 +110,11 @@ class ScheduleFragment : Fragment() {
                 if (Math.abs(deltaX) > swipeThreshold && Math.abs(deltaX) > Math.abs(deltaY)) {
                     if (deltaX < 0) {
                         if (currentWeek < maxWeek) {
-                            currentWeek++
-                            updateWeekDisplay()
-                            renderSchedule()
-                            showToast("第${currentWeek}周")
+                            animateWeekChange(true)
                         }
                     } else {
                         if (currentWeek > 1) {
-                            currentWeek--
-                            updateWeekDisplay()
-                            renderSchedule()
-                            showToast("第${currentWeek}周")
+                            animateWeekChange(false)
                         }
                     }
                     return true
@@ -127,6 +122,46 @@ class ScheduleFragment : Fragment() {
             }
         }
         return false
+    }
+
+    private fun animateWeekChange(goNext: Boolean) {
+        isAnimating = true
+        val gridLayout = binding.gridSchedule
+        val width = gridLayout.width.toFloat()
+        
+        val exitDirection = if (goNext) -width else width
+        val enterDirection = if (goNext) width else -width
+        
+        gridLayout.animate()
+            .translationX(exitDirection)
+            .alpha(0f)
+            .setDuration(250)
+            .setListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    if (goNext) {
+                        currentWeek++
+                    } else {
+                        currentWeek--
+                    }
+                    updateWeekDisplay()
+                    renderSchedule()
+                    
+                    gridLayout.translationX = enterDirection
+                    gridLayout.alpha = 0f
+                    
+                    gridLayout.animate()
+                        .translationX(0f)
+                        .alpha(1f)
+                        .setDuration(250)
+                        .setListener(object : AnimatorListenerAdapter() {
+                            override fun onAnimationEnd(animation: Animator) {
+                                isAnimating = false
+                            }
+                        })
+                        .start()
+                }
+            })
+            .start()
     }
 
     private fun showToast(message: String) {

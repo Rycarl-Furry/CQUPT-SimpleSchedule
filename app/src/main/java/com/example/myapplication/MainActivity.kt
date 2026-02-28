@@ -102,7 +102,7 @@ class MainActivity : AppCompatActivity() {
             val fragment: Fragment = when (item.itemId) {
                 R.id.nav_schedule -> ScheduleFragment.newInstance(curriculumJson ?: "")
                 R.id.nav_notice -> NoticeFragment.newInstance()
-                R.id.nav_exam -> ExamFragment.newInstance()
+                R.id.nav_exam -> ExamFragment.newInstance(studentId ?: "")
                 R.id.nav_settings -> SettingsFragment.newInstance()
                 else -> return@setOnItemSelectedListener false
             }
@@ -124,7 +124,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showExamFragment() {
-        val fragment = ExamFragment.newInstance()
+        val fragment = ExamFragment.newInstance(studentId ?: "")
         replaceFragment(fragment)
     }
 

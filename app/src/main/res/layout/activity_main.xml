@@ -20,7 +20,7 @@
         android:layout_gravity="bottom"
         android:background="#FFFFFF"
         android:paddingTop="4dp"
-        app:itemIconSize="22dp"
+        app:itemIconSize="18dp"
         app:itemIconTint="@color/bottom_nav_color"
         app:itemTextColor="@color/bottom_nav_color"
         app:labelVisibilityMode="labeled"
