@@ -15,12 +15,19 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
+import com.example.myapplication.R
+import com.example.myapplication.cache.CurriculumCache
 import com.example.myapplication.databinding.DialogCourseDetailBinding
+import com.example.myapplication.databinding.DialogSportsBinding
 import com.example.myapplication.databinding.FragmentScheduleBinding
 import com.example.myapplication.model.CourseInstance
 import com.example.myapplication.model.CurriculumResponse
+import com.example.myapplication.model.SportsRecord
+import com.example.myapplication.network.NetworkService
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.gson.Gson
+import kotlinx.coroutines.launch
 
 class ScheduleFragment : Fragment() {
 
@@ -55,6 +62,9 @@ class ScheduleFragment : Fragment() {
     private var touchStartY = 0f
     private val swipeThreshold = 100f
     private var isAnimating = false
+    
+    private val networkService = NetworkService()
+    private lateinit var cache: CurriculumCache
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -67,6 +77,7 @@ class ScheduleFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        cache = CurriculumCache(requireContext())
 
         val curriculumJson = arguments?.getString("curriculum_data")
         if (curriculumJson != null) {
@@ -89,9 +100,258 @@ class ScheduleFragment : Fragment() {
             }
         }
 
+        binding.btnSports.setOnClickListener {
+            showSportsDialog()
+        }
+
         binding.gridSchedule.setOnTouchListener { _, event ->
             handleSwipeGesture(event)
         }
+    }
+
+    private fun showSportsDialog() {
+        val dialogBinding = DialogSportsBinding.inflate(layoutInflater)
+        
+        val dialog = MaterialAlertDialogBuilder(requireContext())
+            .setView(dialogBinding.root)
+            .setBackgroundInsetStart(30)
+            .setBackgroundInsetEnd(30)
+            .setBackgroundInsetTop(20)
+            .setBackgroundInsetBottom(20)
+            .setCancelable(true)
+            .create()
+
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        
+        dialogBinding.btnClose.setOnClickListener {
+            dialog.dismiss()
+        }
+        
+        dialog.show()
+        
+        loadSportsData(dialogBinding)
+    }
+
+    private fun loadSportsData(dialogBinding: DialogSportsBinding) {
+        val token = cache.getAccessToken()
+        
+        if (token == null) {
+            dialogBinding.noLoginView.visibility = View.VISIBLE
+            dialogBinding.emptyView.visibility = View.GONE
+            dialogBinding.progressBar.visibility = View.GONE
+            return
+        }
+        
+        dialogBinding.progressBar.visibility = View.VISIBLE
+        dialogBinding.noLoginView.visibility = View.GONE
+        dialogBinding.emptyView.visibility = View.GONE
+        dialogBinding.recordContainer.removeAllViews()
+        
+        lifecycleScope.launch {
+            val result = networkService.fetchSportsResult(token)
+            dialogBinding.progressBar.visibility = View.GONE
+            
+            result.fold(
+                onSuccess = { response ->
+                    val records = response.data.data.list
+                    val totalCount = response.data.data.totalCount
+                    
+                    if (records.isEmpty()) {
+                        dialogBinding.emptyView.visibility = View.VISIBLE
+                    } else {
+                        displaySportsRecords(dialogBinding, records, totalCount)
+                    }
+                },
+                onFailure = { error ->
+                    Toast.makeText(
+                        requireContext(),
+                        "加载失败: ${error.message}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    dialogBinding.emptyView.visibility = View.VISIBLE
+                }
+            )
+        }
+    }
+
+    private fun displaySportsRecords(
+        dialogBinding: DialogSportsBinding,
+        records: List<SportsRecord>,
+        totalCount: Int
+    ) {
+        var validRunCount = 0
+        var validOtherCount = 0
+        
+        records.forEach { record ->
+            if (record.isValid == "1") {
+                if (record.sportsType == "1") {
+                    validRunCount++
+                } else {
+                    validOtherCount++
+                }
+            }
+        }
+        
+        val validTotalCount = validRunCount + validOtherCount
+        
+        dialogBinding.tvTotalCount.text = validTotalCount.toString()
+        dialogBinding.tvRunCount.text = validRunCount.toString()
+        dialogBinding.tvOtherCount.text = validOtherCount.toString()
+        
+        records.forEach { record ->
+            val recordView = createSportsRecordView(record)
+            dialogBinding.recordContainer.addView(recordView)
+        }
+    }
+
+    private fun createSportsRecordView(record: SportsRecord): View {
+        return LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dpToPx(10), dpToPx(10), dpToPx(10), dpToPx(10))
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 0, 0, dpToPx(6))
+            }
+            
+            val drawable = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = 10f
+                setColor(Color.parseColor("#FAFAFA"))
+                setStroke(1, Color.parseColor("#E8E8E8"))
+            }
+            background = drawable
+            
+            val headerLayout = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+                gravity = android.view.Gravity.CENTER_VERTICAL
+            }
+            
+            val typeText = getSportsTypeText(record.sportsType)
+            val typeColor = if (record.sportsType == "1") "#4CAF50" else "#FF9800"
+            
+            val typeView = TextView(context).apply {
+                text = typeText
+                textSize = 11f
+                setTextColor(Color.parseColor(typeColor))
+                setPadding(dpToPx(6), dpToPx(3), dpToPx(6), dpToPx(3))
+                val chipDrawable = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = 6f
+                    setColor(Color.parseColor(if (record.sportsType == "1") "#E8F5E9" else "#FFF3E0"))
+                }
+                background = chipDrawable
+            }
+            headerLayout.addView(typeView)
+            
+            val dateView = TextView(context).apply {
+                text = formatSportsDate(record.sportsDateStr)
+                textSize = 11f
+                setTextColor(Color.parseColor("#888888"))
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    setMargins(dpToPx(6), 0, 0, 0)
+                }
+            }
+            headerLayout.addView(dateView)
+            
+            val validText = getValidText(record.isValid)
+            val validColor = if (record.isValid == "1") "#4CAF50" else "#E53935"
+            
+            val validView = TextView(context).apply {
+                text = validText
+                textSize = 11f
+                setTextColor(Color.parseColor(validColor))
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+                gravity = android.view.Gravity.END
+            }
+            headerLayout.addView(validView)
+            
+            addView(headerLayout)
+            
+            val timeText = formatSportsTimeRange(record.sportsStartTime, record.sportsEndTime)
+            val timeView = TextView(context).apply {
+                text = "时间: $timeText"
+                textSize = 13f
+                setTextColor(Color.parseColor("#333333"))
+                setPadding(0, dpToPx(6), 0, 0)
+            }
+            addView(timeView)
+            
+            val placeView = TextView(context).apply {
+                text = "地点: ${record.placeName}"
+                textSize = 13f
+                setTextColor(Color.parseColor("#333333"))
+                setPadding(0, dpToPx(3), 0, 0)
+            }
+            addView(placeView)
+            
+            if (record.isValid != "1" && record.reason != null) {
+                val reasonView = TextView(context).apply {
+                    text = "原因: ${getReasonText(record.reason)}"
+                    textSize = 11f
+                    setTextColor(Color.parseColor("#E53935"))
+                    setPadding(0, dpToPx(3), 0, 0)
+                }
+                addView(reasonView)
+            }
+        }
+    }
+
+    private fun getSportsTypeText(type: String): String {
+        return when (type) {
+            "1" -> "跑步"
+            "2" -> "其他"
+            else -> "未知"
+        }
+    }
+
+    private fun getValidText(valid: String): String {
+        return when (valid) {
+            "1" -> "有效"
+            "2" -> "无效"
+            else -> "未知"
+        }
+    }
+
+    private fun getReasonText(reason: String): String {
+        return when (reason) {
+            "4" -> "时长无效"
+            "5" -> "配速过快"
+            "6" -> "配速过慢"
+            "7" -> "距离未达标"
+            "8" -> "锻炼时间内无跑步检测"
+            "9" -> "跑步检测过少"
+            "10" -> "未经过所有摄像头组"
+            "11" -> "第1组摄像头次数未达标"
+            "12" -> "第2组摄像头次数未达标"
+            "13" -> "第3组摄像头次数未达标"
+            else -> reason
+        }
+    }
+
+    private fun formatSportsDate(dateStr: String): String {
+        return if (dateStr.length == 8) {
+            "${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}"
+        } else {
+            dateStr
+        }
+    }
+
+    private fun formatSportsTimeRange(startTime: String, endTime: String): String {
+        val start = startTime.substring(11, minOf(16, startTime.length))
+        val end = endTime.substring(11, minOf(16, endTime.length))
+        return "$start - $end"
     }
 
     private fun handleSwipeGesture(event: MotionEvent): Boolean {
@@ -162,10 +422,6 @@ class ScheduleFragment : Fragment() {
                 }
             })
             .start()
-    }
-
-    private fun showToast(message: String) {
-        Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
     }
 
     private fun calculateCurrentWeek(): Int {

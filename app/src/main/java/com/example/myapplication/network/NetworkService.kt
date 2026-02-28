@@ -2,7 +2,10 @@ package com.example.myapplication.network
 
 import com.example.myapplication.model.CurriculumResponse
 import com.example.myapplication.model.ExamResponse
+import com.example.myapplication.model.LoginRequest
+import com.example.myapplication.model.LoginResponse
 import com.example.myapplication.model.Notice
+import com.example.myapplication.model.SportsResponse
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -69,6 +72,75 @@ class NetworkService {
                 ?: return@withContext Result.failure(IOException("响应体为空"))
             val examResponse = gson.fromJson(responseBody, ExamResponse::class.java)
             Result.success(examResponse)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
+    suspend fun login(username: String, password: String): Result<LoginResponse> = withContext(Dispatchers.IO) {
+        try {
+            val url = "https://sport.rycarl.cn/login"
+            val loginRequest = LoginRequest(username, password)
+            val jsonBody = gson.toJson(loginRequest)
+            val body = jsonBody.toRequestBody(jsonMediaType)
+            val request = Request.Builder()
+                .url(url)
+                .post(body)
+                .build()
+            val response = client.newCall(request).execute()
+            if (!response.isSuccessful) {
+                return@withContext Result.failure(IOException("请求失败: ${response.code}"))
+            }
+            val responseBody = response.body?.string()
+                ?: return@withContext Result.failure(IOException("响应体为空"))
+            val loginResponse = gson.fromJson(responseBody, LoginResponse::class.java)
+            if (loginResponse.success) {
+                Result.success(loginResponse)
+            } else {
+                Result.failure(IOException("登录失败"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
+    suspend fun fetchSportsResult(accessToken: String): Result<SportsResponse> = withContext(Dispatchers.IO) {
+        try {
+            val url = "https://sport.rycarl.cn/sports/result"
+            val jsonBody = gson.toJson(mapOf("access_token" to accessToken))
+            val body = jsonBody.toRequestBody(jsonMediaType)
+            val request = Request.Builder()
+                .url(url)
+                .post(body)
+                .build()
+            val response = client.newCall(request).execute()
+            if (!response.isSuccessful) {
+                return@withContext Result.failure(IOException("请求失败: ${response.code}"))
+            }
+            val responseBody = response.body?.string()
+                ?: return@withContext Result.failure(IOException("响应体为空"))
+            val sportsResponse = gson.fromJson(responseBody, SportsResponse::class.java)
+            if (sportsResponse.success) {
+                Result.success(sportsResponse)
+            } else {
+                Result.failure(IOException("获取体育打卡数据失败"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
+    suspend fun fetchLatestVersion(): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            val url = "https://rycarl.cn/ver.txt"
+            val request = Request.Builder().url(url).build()
+            val response = client.newCall(request).execute()
+            if (!response.isSuccessful) {
+                return@withContext Result.failure(IOException("请求失败: ${response.code}"))
+            }
+            val responseBody = response.body?.string()
+                ?: return@withContext Result.failure(IOException("响应体为空"))
+            Result.success(responseBody.trim())
         } catch (e: Exception) {
             Result.failure(e)
         }

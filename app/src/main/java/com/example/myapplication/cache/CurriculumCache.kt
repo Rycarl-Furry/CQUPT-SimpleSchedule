@@ -44,6 +44,51 @@ class CurriculumCache(private val context: Context) {
         return prefs.getString("last_login_student_id", null)
     }
     
+    fun saveAccessToken(token: String) {
+        prefs.edit()
+            .putString("access_token", token)
+            .apply()
+    }
+    
+    fun getAccessToken(): String? {
+        return prefs.getString("access_token", null)
+    }
+    
+    fun saveAutoLoginCredentials(username: String, password: String) {
+        prefs.edit()
+            .putString("ids_username", username)
+            .putString("ids_password", password)
+            .putBoolean("auto_login_enabled", true)
+            .apply()
+    }
+    
+    fun getAutoLoginCredentials(): Pair<String, String>? {
+        val username = prefs.getString("ids_username", null) ?: return null
+        val password = prefs.getString("ids_password", null) ?: return null
+        return Pair(username, password)
+    }
+    
+    fun isAutoLoginEnabled(): Boolean {
+        return prefs.getBoolean("auto_login_enabled", false)
+    }
+    
+    fun disableAutoLogin() {
+        prefs.edit()
+            .remove("ids_username")
+            .remove("ids_password")
+            .putBoolean("auto_login_enabled", false)
+            .apply()
+    }
+    
+    fun clearIdsCredentials() {
+        prefs.edit()
+            .remove("access_token")
+            .remove("ids_username")
+            .remove("ids_password")
+            .putBoolean("auto_login_enabled", false)
+            .apply()
+    }
+    
     fun clear() {
         prefs.edit().clear().apply()
     }

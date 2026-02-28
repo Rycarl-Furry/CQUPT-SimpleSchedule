@@ -47,13 +47,24 @@
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="当前周次"
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnSports"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:text="体育打卡"
                     android:textSize="12sp"
-                    android:textColor="#888888" />
+                    app:cornerRadius="18dp"
+                    app:strokeColor="#4A90D9"
+                    android:textColor="#4A90D9"
+                    app:icon="@drawable/ic_sports"
+                    app:iconTint="#4A90D9"
+                    app:iconPadding="4dp" />
+
+                <View
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="1" />
 
                 <LinearLayout
                     android:layout_width="wrap_content"
