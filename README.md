@@ -2,6 +2,7 @@
 
 一个简洁、现代的课程表应用，用于查看和管理课程安排。
 
+<<<<<<< HEAD
 ## 功能特性
 
 - 🎨 **现代化UI** - 圆角设计，简洁美观的界面
@@ -28,15 +29,26 @@
 ### 方法一：直接安装APK
 1. 下载 `app/build/outputs/apk/debug/app-debug.apk`
 2. 在Android设备上安装APK文件
+=======
+## 安装说明
+
+### 方法一：直接安装APK
+release里面下载安装
+>>>>>>> b57aec2c0427f9dc8ddd0e627d4a5f9cbd7b12f3
 
 ### 方法二：从源码构建
 1. 克隆仓库
    ```bash
+<<<<<<< HEAD
    git clone https://github.com/你的用户名/SimpleSchedule.git
+=======
+   git clone https://github.com/Rycarl-Furry/CQUPT-SimpleSchedule.git
+>>>>>>> b57aec2c0427f9dc8ddd0e627d4a5f9cbd7b12f3
    cd SimpleSchedule
    ```
 2. 使用Android Studio打开项目
 3. 构建并运行
+<<<<<<< HEAD
 
 ## 使用方法
 
@@ -84,3 +96,5 @@ MIT License
 ---
 
 *SimpleSchedule - 让课程管理更简单*
+=======
+>>>>>>> b57aec2c0427f9dc8ddd0e627d4a5f9cbd7b12f3
