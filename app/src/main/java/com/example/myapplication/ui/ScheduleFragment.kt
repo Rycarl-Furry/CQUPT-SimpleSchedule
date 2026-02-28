@@ -5,11 +5,13 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.Gravity
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.GridLayout
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.fragment.app.Fragment
 import com.example.myapplication.databinding.DialogCourseDetailBinding
 import com.example.myapplication.databinding.FragmentScheduleBinding
@@ -47,6 +49,10 @@ class ScheduleFragment : Fragment() {
     private var courseColorMap = mutableMapOf<String, Int>()
     private var colorIndex = 0
 
+    private var touchStartX = 0f
+    private var touchStartY = 0f
+    private val swipeThreshold = 100f
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -83,6 +89,48 @@ class ScheduleFragment : Fragment() {
                 renderSchedule()
             }
         }
+
+        binding.gridSchedule.setOnTouchListener { _, event ->
+            handleSwipeGesture(event)
+        }
+    }
+
+    private fun handleSwipeGesture(event: MotionEvent): Boolean {
+        when (event.action) {
+            MotionEvent.ACTION_DOWN -> {
+                touchStartX = event.x
+                touchStartY = event.y
+                return true
+            }
+            MotionEvent.ACTION_UP -> {
+                val deltaX = event.x - touchStartX
+                val deltaY = event.y - touchStartY
+                
+                if (Math.abs(deltaX) > swipeThreshold && Math.abs(deltaX) > Math.abs(deltaY)) {
+                    if (deltaX < 0) {
+                        if (currentWeek < maxWeek) {
+                            currentWeek++
+                            updateWeekDisplay()
+                            renderSchedule()
+                            showToast("第${currentWeek}周")
+                        }
+                    } else {
+                        if (currentWeek > 1) {
+                            currentWeek--
+                            updateWeekDisplay()
+                            renderSchedule()
+                            showToast("第${currentWeek}周")
+                        }
+                    }
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    private fun showToast(message: String) {
+        Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
     }
 
     private fun calculateCurrentWeek(): Int {
@@ -145,12 +193,12 @@ class ScheduleFragment : Fragment() {
                     GridLayout.spec(0, 1, 0.8f)
                 ).apply {
                     width = 0
-                    height = ViewGroup.LayoutParams.WRAP_CONTENT
-                    setMargins(2, 2, 2, 2)
+                    height = 0
+                    setMargins(1, 1, 1, 1)
                 }
                 gravity = Gravity.CENTER
                 text = "${period + 1}"
-                textSize = 12f
+                textSize = 10f
                 setTextColor(Color.parseColor("#666666"))
             }
             gridLayout.addView(periodView)
@@ -178,8 +226,8 @@ class ScheduleFragment : Fragment() {
                         GridLayout.spec(day + 1, 1, 1f)
                     ).apply {
                         width = 0
-                        height = ViewGroup.LayoutParams.WRAP_CONTENT
-                        setMargins(2, 2, 2, 2)
+                        height = 0
+                        setMargins(1, 1, 1, 1)
                     }
                     courseView.layoutParams = layoutParams
                     gridLayout.addView(courseView)
@@ -190,13 +238,13 @@ class ScheduleFragment : Fragment() {
                             GridLayout.spec(day + 1, 1, 1f)
                         ).apply {
                             width = 0
-                            height = dpToPx(48)
-                            setMargins(2, 2, 2, 2)
+                            height = 0
+                            setMargins(1, 1, 1, 1)
                         }
                         val drawable = GradientDrawable().apply {
                             shape = GradientDrawable.RECTANGLE
-                            cornerRadius = 6f
-                            setColor(Color.parseColor("#F0F0F0"))
+                            cornerRadius = 4f
+                            setColor(Color.parseColor("#F5F5F5"))
                         }
                         background = drawable
                     }
@@ -209,20 +257,20 @@ class ScheduleFragment : Fragment() {
     private fun createCourseView(course: CourseInstance, periodCount: Int): View {
         return LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4))
+            setPadding(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2))
             gravity = Gravity.CENTER
 
             val color = courseColorMap[course.course] ?: Color.parseColor("#E3F2FD")
             val drawable = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
-                cornerRadius = 8f
+                cornerRadius = 6f
                 setColor(color)
             }
             background = drawable
 
             val nameView = TextView(context).apply {
                 text = course.course
-                textSize = if (periodCount >= 2) 10f else 9f
+                textSize = if (periodCount >= 2) 9f else 8f
                 setTextColor(Color.parseColor("#1565C0"))
                 gravity = Gravity.CENTER
                 setLines(2)
@@ -236,11 +284,11 @@ class ScheduleFragment : Fragment() {
             if (periodCount >= 2) {
                 val locationView = TextView(context).apply {
                     text = course.location
-                    textSize = 8f
+                    textSize = 7f
                     setTextColor(Color.parseColor("#666666"))
                     gravity = Gravity.CENTER
                     maxLines = 1
-                    setPadding(0, dpToPx(2), 0, 0)
+                    setPadding(0, dpToPx(1), 0, 0)
                 }
                 addView(locationView, LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,

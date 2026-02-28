@@ -7,14 +7,14 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.example.myapplication.cache.CurriculumCache
 import com.example.myapplication.databinding.ActivityLoginBinding
-import com.example.myapplication.network.CurriculumService
+import com.example.myapplication.network.NetworkService
 import com.google.gson.Gson
 import kotlinx.coroutines.launch
 
 class LoginActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityLoginBinding
-    private val curriculumService = CurriculumService()
+    private val networkService = NetworkService()
     private lateinit var cache: CurriculumCache
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -86,7 +86,7 @@ class LoginActivity : AppCompatActivity() {
         }
 
         lifecycleScope.launch {
-            val result = curriculumService.fetchCurriculum(studentId)
+            val result = networkService.fetchCurriculum(studentId)
             binding.progressBar.visibility = android.view.View.GONE
             binding.btnLogin.isEnabled = true
 

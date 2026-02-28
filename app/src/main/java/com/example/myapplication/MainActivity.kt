@@ -8,7 +8,7 @@ import androidx.lifecycle.lifecycleScope
 import com.example.myapplication.cache.CurriculumCache
 import com.example.myapplication.databinding.ActivityMainBinding
 import com.example.myapplication.model.CurriculumResponse
-import com.example.myapplication.network.CurriculumService
+import com.example.myapplication.network.NetworkService
 import com.example.myapplication.ui.ExamFragment
 import com.example.myapplication.ui.NoticeFragment
 import com.example.myapplication.ui.ScheduleFragment
@@ -25,7 +25,7 @@ class MainActivity : AppCompatActivity() {
     private var curriculumData: CurriculumResponse? = null
     private var currentNavId: Int = 0
     
-    private val curriculumService = CurriculumService()
+    private val networkService = NetworkService()
     private lateinit var cache: CurriculumCache
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -54,7 +54,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun refreshInBackground(studentId: String) {
         lifecycleScope.launch {
-            val result = curriculumService.fetchCurriculum(studentId)
+            val result = networkService.fetchCurriculum(studentId)
             result.fold(
                 onSuccess = { newCurriculum ->
                     val cachedData = cache.get(studentId)
