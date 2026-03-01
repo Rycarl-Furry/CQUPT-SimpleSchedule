@@ -165,4 +165,14 @@ class CurriculumCache(private val context: Context) {
         val schedules = getCustomSchedules().filter { it.id != scheduleId }
         saveCustomSchedules(schedules)
     }
+    
+    fun saveFontSize(size: Float) {
+        prefs.edit()
+            .putFloat("font_size", size)
+            .apply()
+    }
+    
+    fun getFontSize(): Float {
+        return prefs.getFloat("font_size", 1.0f)
+    }
 }

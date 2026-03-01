@@ -1,6 +1,7 @@
 package com.example.myapplication
 
 import android.Manifest
+import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -12,6 +13,7 @@ import com.example.myapplication.cache.CurriculumCache
 import com.example.myapplication.databinding.ActivityMainBinding
 import com.example.myapplication.model.CurriculumResponse
 import com.example.myapplication.network.NetworkService
+import com.example.myapplication.LoginActivity
 import com.example.myapplication.ui.ExamFragment
 import com.example.myapplication.ui.NoticeFragment
 import com.example.myapplication.ui.ScheduleFragment
@@ -39,32 +41,45 @@ class MainActivity : AppCompatActivity() {
     private val PERMISSION_REQUEST_CODE = 1001
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // 先还原主题，因为启动时使用了SplashTheme
+        setTheme(R.style.Theme_MyApplication)
         super.onCreate(savedInstanceState)
+        
         cache = CurriculumCache(this)
-        binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-
-        curriculumJson = intent.getStringExtra("curriculum_data")
-        studentId = intent.getStringExtra("student_id")
-        val fromCache = intent.getBooleanExtra("from_cache", false)
-
-        curriculumData = curriculumJson?.let { Gson().fromJson(it, CurriculumResponse::class.java) }
-
-        setupBottomNavigation()
-
-        if (savedInstanceState == null) {
-            currentNavId = R.id.nav_schedule
-            showScheduleFragment()
-        }
-
-        // 延迟执行非必要操作，优先显示界面
-        Handler(Looper.getMainLooper()).post {
-            if (fromCache && studentId != null) {
-                refreshInBackground(studentId!!)
+        
+        // 检查缓存
+        val lastLoginId = cache.getLastLogin()
+        if (lastLoginId != null && cache.hasCache(lastLoginId)) {
+            val cachedData = cache.get(lastLoginId)
+            if (cachedData != null) {
+                curriculumData = cachedData
+                curriculumJson = Gson().toJson(cachedData)
+                studentId = lastLoginId
+                
+                binding = ActivityMainBinding.inflate(layoutInflater)
+                setContentView(binding.root)
+                
+                setupBottomNavigation()
+                
+                if (savedInstanceState == null) {
+                    currentNavId = R.id.nav_schedule
+                    showScheduleFragment()
+                }
+                
+                // 延迟执行非必要操作，优先显示界面
+                Handler(Looper.getMainLooper()).post {
+                    refreshInBackground(studentId!!)
+                    performAutoIdsLogin()
+                    checkPermissions()
+                }
+                return
             }
-            performAutoIdsLogin()
-            checkPermissions()
         }
+        
+        // 无缓存，跳转到登录界面
+        val intent = Intent(this, LoginActivity::class.java)
+        startActivity(intent)
+        finish()
     }
 
     private fun checkPermissions() {

@@ -20,24 +20,7 @@ class LoginActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         cache = CurriculumCache(this)
-        
-        val lastLoginId = cache.getLastLogin()
-        if (lastLoginId != null && cache.hasCache(lastLoginId)) {
-            val cachedData = cache.get(lastLoginId)
-            if (cachedData != null) {
-                val intent = Intent(this, MainActivity::class.java).apply {
-                    putExtra("curriculum_data", Gson().toJson(cachedData))
-                    putExtra("student_id", lastLoginId)
-                    putExtra("from_cache", true)
-                }
-                startActivity(intent)
-                finish()
-                return
-            }
-        }
-        
         binding = ActivityLoginBinding.inflate(layoutInflater)
-        setTheme(R.style.Theme_MyApplication)
         setContentView(binding.root)
 
         val lastId = cache.getLastLogin()
@@ -55,59 +38,9 @@ class LoginActivity : AppCompatActivity() {
         }
     }
 
-    private fun autoLogin(studentId: String) {
-        val cachedData = cache.get(studentId)
-        if (cachedData != null) {
-            cache.saveLastLogin(studentId)
-            val intent = Intent(this, MainActivity::class.java).apply {
-                putExtra("curriculum_data", Gson().toJson(cachedData))
-                putExtra("student_id", studentId)
-                putExtra("from_cache", true)
-            }
-            startActivity(intent)
-            finish()
-        } else {
-            showLoginForm()
-        }
-    }
-
-    private fun showLoginForm() {
-        setTheme(R.style.Theme_MyApplication)
-        binding = ActivityLoginBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-        
-        val lastLoginId = cache.getLastLogin()
-        if (lastLoginId != null) {
-            binding.etStudentId.setText(lastLoginId)
-        }
-
-        binding.btnLogin.setOnClickListener {
-            val studentId = binding.etStudentId.text.toString().trim()
-            if (studentId.isEmpty()) {
-                Toast.makeText(this, "请输入学号", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            loadCurriculum(studentId)
-        }
-    }
-
     private fun loadCurriculum(studentId: String) {
         binding.progressBar.visibility = android.view.View.VISIBLE
         binding.btnLogin.isEnabled = false
-
-        val cachedData = cache.get(studentId)
-        
-        if (cachedData != null) {
-            cache.saveLastLogin(studentId)
-            val intent = Intent(this, MainActivity::class.java).apply {
-                putExtra("curriculum_data", Gson().toJson(cachedData))
-                putExtra("student_id", studentId)
-                putExtra("from_cache", true)
-            }
-            startActivity(intent)
-            finish()
-            return
-        }
 
         lifecycleScope.launch {
             val result = networkService.fetchCurriculum(studentId)
@@ -118,11 +51,7 @@ class LoginActivity : AppCompatActivity() {
                 onSuccess = { curriculum ->
                     cache.save(studentId, curriculum)
                     cache.saveLastLogin(studentId)
-                    val intent = Intent(this@LoginActivity, MainActivity::class.java).apply {
-                        putExtra("curriculum_data", Gson().toJson(curriculum))
-                        putExtra("student_id", studentId)
-                        putExtra("from_cache", false)
-                    }
+                    val intent = Intent(this@LoginActivity, MainActivity::class.java)
                     startActivity(intent)
                     finish()
                 },

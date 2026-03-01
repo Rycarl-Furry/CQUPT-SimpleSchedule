@@ -50,8 +50,57 @@ class SettingsFragment : Fragment() {
         setupCheckUpdate()
         setupAbout()
         setupLogout()
+        setupFontSize()
         updateIdsStatus()
         updateUpdateStatus()
+    }
+    
+    private fun setupFontSize() {
+        binding.btnFontSize.setOnClickListener {
+            showFontSizeDialog()
+        }
+        updateFontSizeDisplay()
+    }
+    
+    private fun updateFontSizeDisplay() {
+        val fontSize = cache.getFontSize()
+        binding.tvFontSize.text = when (fontSize) {
+            0.8f -> "小"
+            1.0f -> "标准"
+            1.2f -> "大"
+            1.4f -> "特大"
+            else -> "标准"
+        }
+    }
+    
+    private fun showFontSizeDialog() {
+        val options = arrayOf("小", "标准", "大", "特大")
+        val currentFontSize = cache.getFontSize()
+        val currentIndex = when (currentFontSize) {
+            0.8f -> 0
+            1.0f -> 1
+            1.2f -> 2
+            1.4f -> 3
+            else -> 1
+        }
+        
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("选择字体大小")
+            .setSingleChoiceItems(options, currentIndex) { dialog, which ->
+                val selectedSize = when (which) {
+                    0 -> 0.8f
+                    1 -> 1.0f
+                    2 -> 1.2f
+                    3 -> 1.4f
+                    else -> 1.0f
+                }
+                cache.saveFontSize(selectedSize)
+                updateFontSizeDisplay()
+                dialog.dismiss()
+                // 提示用户重启应用生效
+                android.widget.Toast.makeText(requireContext(), "字体大小已更新，重启应用后生效", android.widget.Toast.LENGTH_SHORT).show()
+            }
+            .show()
     }
 
     private fun updateUpdateStatus() {

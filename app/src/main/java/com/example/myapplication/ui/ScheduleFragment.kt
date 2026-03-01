@@ -84,9 +84,12 @@ class ScheduleFragment : Fragment() {
         return binding.root
     }
 
+    private var fontSize = 1.0f
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         cache = CurriculumCache(requireContext())
+        fontSize = cache.getFontSize()
         customSchedules = cache.getCustomSchedules()
 
         val curriculumJson = arguments?.getString("curriculum_data")
@@ -771,7 +774,7 @@ class ScheduleFragment : Fragment() {
 
             val nameView = TextView(context).apply {
                 text = course.course
-                textSize = if (periodCount >= 2) 9f else 8f
+                textSize = (if (periodCount >= 2) 9f else 8f) * fontSize
                 setTextColor(Color.parseColor("#1565C0"))
                 gravity = Gravity.CENTER
                 setLines(2)
@@ -785,7 +788,7 @@ class ScheduleFragment : Fragment() {
             if (periodCount >= 2) {
                 val locationView = TextView(context).apply {
                     text = course.location
-                    textSize = 7f
+                    textSize = 7f * fontSize
                     setTextColor(Color.parseColor("#333333"))
                     gravity = Gravity.CENTER
                     maxLines = 1
@@ -821,7 +824,7 @@ class ScheduleFragment : Fragment() {
 
             val nameView = TextView(context).apply {
                 text = schedule.title
-                textSize = if (periodCount >= 2) 9f else 8f
+                textSize = (if (periodCount >= 2) 9f else 8f) * fontSize
                 setTextColor(Color.parseColor("#0D47A1"))
                 gravity = Gravity.CENTER
                 setLines(2)
@@ -835,7 +838,7 @@ class ScheduleFragment : Fragment() {
             if (periodCount >= 2 && schedule.location.isNotEmpty()) {
                 val locationView = TextView(context).apply {
                     text = schedule.location
-                    textSize = 7f
+                    textSize = 7f * fontSize
                     setTextColor(Color.parseColor("#333333"))
                     gravity = Gravity.CENTER
                     maxLines = 1
