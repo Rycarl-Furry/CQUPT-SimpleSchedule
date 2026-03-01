@@ -654,7 +654,7 @@ class ScheduleFragment : Fragment() {
                 gravity = Gravity.CENTER
                 text = "${period + 1}"
                 textSize = 10f
-                setTextColor(Color.parseColor("#666666"))
+                setTextColor(Color.parseColor("#333333"))
             }
             gridLayout.addView(periodView)
 
@@ -786,7 +786,7 @@ class ScheduleFragment : Fragment() {
                 val locationView = TextView(context).apply {
                     text = course.location
                     textSize = 7f
-                    setTextColor(Color.parseColor("#666666"))
+                    setTextColor(Color.parseColor("#333333"))
                     gravity = Gravity.CENTER
                     maxLines = 1
                     setPadding(0, dpToPx(1), 0, 0)
@@ -836,7 +836,7 @@ class ScheduleFragment : Fragment() {
                 val locationView = TextView(context).apply {
                     text = schedule.location
                     textSize = 7f
-                    setTextColor(Color.parseColor("#666666"))
+                    setTextColor(Color.parseColor("#333333"))
                     gravity = Gravity.CENTER
                     maxLines = 1
                     setPadding(0, dpToPx(1), 0, 0)
