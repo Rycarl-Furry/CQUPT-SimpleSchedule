@@ -167,9 +167,9 @@ class SettingsFragment : Fragment() {
             val result = networkService.fetchLatestVersion()
             
             result.fold(
-                onSuccess = { latestVersion ->
-                    if (latestVersion != currentVersion) {
-                        showUpdateDialog(latestVersion)
+                onSuccess = { versionInfo ->
+                    if (versionInfo.version != currentVersion) {
+                        showUpdateDialog(versionInfo)
                     } else {
                         Toast.makeText(requireContext(), "已是最新版本", Toast.LENGTH_SHORT).show()
                     }
@@ -185,10 +185,21 @@ class SettingsFragment : Fragment() {
         }
     }
 
-    private fun showUpdateDialog(latestVersion: String) {
+    private fun showUpdateDialog(versionInfo: com.example.myapplication.network.NetworkService.VersionInfo) {
+        val message = buildString {
+            append("有可用更新: ${versionInfo.version}\n")
+            append("当前版本: $currentVersion\n\n")
+            if (versionInfo.updateContent.isNotEmpty()) {
+                append("更新内容:\n")
+                append(versionInfo.updateContent)
+                append("\n\n")
+            }
+            append("是否前往GitHub下载?")
+        }
+        
         MaterialAlertDialogBuilder(requireContext())
             .setTitle("发现新版本")
-            .setMessage("有可用更新: $latestVersion\n当前版本: $currentVersion\n\n是否前往GitHub下载?")
+            .setMessage(message)
             .setPositiveButton("前往下载") { _, _ ->
                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Rycarl-Furry/CQUPT-SimpleSchedule/releases"))
                 startActivity(intent)

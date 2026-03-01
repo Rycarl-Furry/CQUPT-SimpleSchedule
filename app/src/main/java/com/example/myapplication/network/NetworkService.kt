@@ -130,7 +130,12 @@ class NetworkService {
         }
     }
     
-    suspend fun fetchLatestVersion(): Result<String> = withContext(Dispatchers.IO) {
+    data class VersionInfo(
+        val version: String,
+        val updateContent: String
+    )
+
+    suspend fun fetchLatestVersion(): Result<VersionInfo> = withContext(Dispatchers.IO) {
         try {
             val url = "https://rycarl.cn/ver.txt"
             val request = Request.Builder().url(url).build()
@@ -140,7 +145,17 @@ class NetworkService {
             }
             val responseBody = response.body?.string()
                 ?: return@withContext Result.failure(IOException("响应体为空"))
-            Result.success(responseBody.trim())
+            
+            val lines = responseBody.lines().map { it.trim() }
+            val version = lines.firstOrNull() ?: ""
+            val updateContentIndex = lines.indexOfFirst { it.startsWith("更新内容:") }
+            val updateContent = if (updateContentIndex != -1 && updateContentIndex + 1 < lines.size) {
+                lines.subList(updateContentIndex + 1, lines.size).joinToString("\n")
+            } else {
+                ""
+            }
+            
+            Result.success(VersionInfo(version, updateContent))
         } catch (e: Exception) {
             Result.failure(e)
         }
