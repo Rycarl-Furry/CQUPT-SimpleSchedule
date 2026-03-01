@@ -23,11 +23,21 @@ class LoginActivity : AppCompatActivity() {
         
         val lastLoginId = cache.getLastLogin()
         if (lastLoginId != null && cache.hasCache(lastLoginId)) {
-            autoLogin(lastLoginId)
-            return
+            val cachedData = cache.get(lastLoginId)
+            if (cachedData != null) {
+                val intent = Intent(this, MainActivity::class.java).apply {
+                    putExtra("curriculum_data", Gson().toJson(cachedData))
+                    putExtra("student_id", lastLoginId)
+                    putExtra("from_cache", true)
+                }
+                startActivity(intent)
+                finish()
+                return
+            }
         }
         
         binding = ActivityLoginBinding.inflate(layoutInflater)
+        setTheme(R.style.Theme_MyApplication)
         setContentView(binding.root)
 
         val lastId = cache.getLastLogin()
@@ -62,6 +72,7 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun showLoginForm() {
+        setTheme(R.style.Theme_MyApplication)
         binding = ActivityLoginBinding.inflate(layoutInflater)
         setContentView(binding.root)
         

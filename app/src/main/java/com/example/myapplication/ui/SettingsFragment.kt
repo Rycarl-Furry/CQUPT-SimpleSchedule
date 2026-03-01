@@ -15,6 +15,7 @@ import com.example.myapplication.databinding.DialogAboutBinding
 import com.example.myapplication.databinding.DialogDownloadProgressBinding
 import com.example.myapplication.databinding.DialogIdsLoginBinding
 import com.example.myapplication.databinding.FragmentSettingsBinding
+import com.example.myapplication.Constants
 import com.example.myapplication.network.NetworkService
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.launch
@@ -27,7 +28,7 @@ class SettingsFragment : Fragment() {
     private val networkService = NetworkService()
     private lateinit var cache: CurriculumCache
     
-    private val currentVersion = "v1.0.6"
+    private val currentVersion = Constants.VERSION_NAME
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -363,6 +364,9 @@ class SettingsFragment : Fragment() {
 
     private fun showAboutDialog() {
         val dialogBinding = DialogAboutBinding.inflate(layoutInflater)
+        
+        // 设置版本号
+        dialogBinding.tvVersion.text = Constants.VERSION_NAME
         
         val dialog = MaterialAlertDialogBuilder(requireContext())
             .setView(dialogBinding.root)

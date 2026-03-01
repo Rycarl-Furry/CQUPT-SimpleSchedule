@@ -2,6 +2,8 @@ package com.example.myapplication
 
 import android.Manifest
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
@@ -13,6 +15,7 @@ import com.example.myapplication.network.NetworkService
 import com.example.myapplication.ui.ExamFragment
 import com.example.myapplication.ui.NoticeFragment
 import com.example.myapplication.ui.ScheduleFragment
+import com.example.myapplication.Constants
 import com.example.myapplication.ui.SettingsFragment
 import com.google.android.material.navigation.NavigationBarView
 import com.google.gson.Gson
@@ -31,7 +34,7 @@ class MainActivity : AppCompatActivity() {
     
     private val networkService = NetworkService()
     private lateinit var cache: CurriculumCache
-    private val currentVersion = "v1.0.6"
+    private val currentVersion = Constants.VERSION_NAME
 
     private val PERMISSION_REQUEST_CODE = 1001
 
@@ -54,14 +57,14 @@ class MainActivity : AppCompatActivity() {
             showScheduleFragment()
         }
 
-        if (fromCache && studentId != null) {
-            refreshInBackground(studentId!!)
+        // 延迟执行非必要操作，优先显示界面
+        Handler(Looper.getMainLooper()).post {
+            if (fromCache && studentId != null) {
+                refreshInBackground(studentId!!)
+            }
+            performAutoIdsLogin()
+            checkPermissions()
         }
-        
-        performAutoIdsLogin()
-        
-        // 检查权限
-        checkPermissions()
     }
 
     private fun checkPermissions() {
@@ -194,6 +197,7 @@ class MainActivity : AppCompatActivity() {
                 return@setOnItemSelectedListener true
             }
             
+            val oldNavId = currentNavId
             val fragment: Fragment = when (item.itemId) {
                 R.id.nav_schedule -> ScheduleFragment.newInstance(curriculumJson ?: "")
                 R.id.nav_notice -> NoticeFragment.newInstance()
@@ -203,14 +207,50 @@ class MainActivity : AppCompatActivity() {
             }
             
             currentNavId = item.itemId
-            replaceFragmentWithAnimation(fragment)
+            replaceFragmentWithSlideAnimation(fragment, oldNavId, item.itemId)
             true
         }
     }
 
+    private fun getNavOrder(navId: Int): Int {
+        return when (navId) {
+            R.id.nav_schedule -> 0
+            R.id.nav_notice -> 1
+            R.id.nav_exam -> 2
+            R.id.nav_settings -> 3
+            else -> 0
+        }
+    }
+
+    private fun replaceFragmentWithSlideAnimation(fragment: Fragment, oldNavId: Int, newNavId: Int) {
+        val oldOrder = getNavOrder(oldNavId)
+        val newOrder = getNavOrder(newNavId)
+        
+        val enterAnim: Int
+        val exitAnim: Int
+        
+        if (newOrder > oldOrder) {
+            // 向右滑动（新页面从右边进入，旧页面向左退出）
+            enterAnim = R.anim.slide_in_right
+            exitAnim = R.anim.slide_out_left
+        } else {
+            // 向左滑动（新页面从左边进入，旧页面向右退出）
+            enterAnim = R.anim.slide_in_left
+            exitAnim = R.anim.slide_out_right
+        }
+        
+        supportFragmentManager.beginTransaction()
+            .setCustomAnimations(enterAnim, exitAnim, enterAnim, exitAnim)
+            .replace(R.id.fragmentContainer, fragment)
+            .commit()
+    }
+
     private fun showScheduleFragment() {
         val fragment = ScheduleFragment.newInstance(curriculumJson ?: "")
-        replaceFragment(fragment)
+        supportFragmentManager.beginTransaction()
+            .setCustomAnimations(R.anim.fade_in_smooth, 0, 0, 0)
+            .replace(R.id.fragmentContainer, fragment)
+            .commit()
     }
 
     private fun showNoticeFragment() {
@@ -230,13 +270,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun replaceFragment(fragment: Fragment) {
         supportFragmentManager.beginTransaction()
-            .replace(R.id.fragmentContainer, fragment)
-            .commit()
-    }
-
-    private fun replaceFragmentWithAnimation(fragment: Fragment) {
-        supportFragmentManager.beginTransaction()
-            .setCustomAnimations(R.anim.fade_in, 0, 0, 0)
             .replace(R.id.fragmentContainer, fragment)
             .commit()
     }
