@@ -1,0 +1,46 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="80dp"
+    android:height="80dp"
+    android:viewportWidth="80"
+    android:viewportHeight="80">
+    <!-- 背景 -->
+    <path
+        android:fillColor="#4A90D9"
+        android:pathData="M0,0 L80,0 L80,80 L0,80 Z"/>
+    <!-- 课程表网格 -->
+    <!-- 横线 -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:pathData="M12,32 L68,32"/>
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:pathData="M12,48 L68,48"/>
+    <!-- 竖线 -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:pathData="M26,16 L26,64"/>
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:pathData="M40,16 L40,64"/>
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:pathData="M54,16 L54,64"/>
+    <!-- 课程块 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M14,18 L24,18 L24,30 L14,30 Z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M28,34 L38,34 L38,46 L28,46 Z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M42,18 L52,18 L52,46 L42,46 Z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M56,40 L66,40 L66,62 L56,62 Z"/>
+</vector>

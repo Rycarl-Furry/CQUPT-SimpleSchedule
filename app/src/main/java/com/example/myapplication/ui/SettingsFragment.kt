@@ -11,6 +11,7 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.example.myapplication.LoginActivity
 import com.example.myapplication.cache.CurriculumCache
+import com.example.myapplication.databinding.DialogAboutBinding
 import com.example.myapplication.databinding.DialogIdsLoginBinding
 import com.example.myapplication.databinding.FragmentSettingsBinding
 import com.example.myapplication.network.NetworkService
@@ -25,7 +26,7 @@ class SettingsFragment : Fragment() {
     private val networkService = NetworkService()
     private lateinit var cache: CurriculumCache
     
-    private val currentVersion = "v1.0.4"
+    private val currentVersion = "v1.0.5"
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -45,6 +46,7 @@ class SettingsFragment : Fragment() {
         
         setupIdsLogin()
         setupCheckUpdate()
+        setupAbout()
         setupLogout()
         updateIdsStatus()
     }
@@ -188,11 +190,48 @@ class SettingsFragment : Fragment() {
             .setTitle("发现新版本")
             .setMessage("有可用更新: $latestVersion\n当前版本: $currentVersion\n\n是否前往GitHub下载?")
             .setPositiveButton("前往下载") { _, _ ->
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/rycarl/SimpleSchedule/releases"))
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Rycarl-Furry/CQUPT-SimpleSchedule/releases"))
                 startActivity(intent)
             }
             .setNegativeButton("稍后提醒", null)
             .show()
+    }
+
+    private fun setupAbout() {
+        binding.btnAbout.setOnClickListener {
+            showAboutDialog()
+        }
+    }
+
+    private fun showAboutDialog() {
+        val dialogBinding = DialogAboutBinding.inflate(layoutInflater)
+        
+        val dialog = MaterialAlertDialogBuilder(requireContext())
+            .setView(dialogBinding.root)
+            .setBackgroundInsetStart(40)
+            .setBackgroundInsetEnd(40)
+            .setBackgroundInsetTop(20)
+            .setBackgroundInsetBottom(20)
+            .setCancelable(true)
+            .create()
+
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        
+        dialogBinding.btnGithub.setOnClickListener {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Rycarl-Furry/CQUPT-SimpleSchedule"))
+            startActivity(intent)
+        }
+        
+        dialogBinding.btnBlog.setOnClickListener {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://rycarl.cn"))
+            startActivity(intent)
+        }
+        
+        dialogBinding.btnClose.setOnClickListener {
+            dialog.dismiss()
+        }
+        
+        dialog.show()
     }
 
     private fun setupLogout() {

@@ -16,10 +16,14 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.LinearSnapHelper
+import androidx.recyclerview.widget.RecyclerView
 import com.example.myapplication.R
 import com.example.myapplication.cache.CurriculumCache
 import com.example.myapplication.databinding.DialogCourseDetailBinding
 import com.example.myapplication.databinding.DialogSportsBinding
+import com.example.myapplication.databinding.DialogWeekPickerBinding
 import com.example.myapplication.databinding.FragmentScheduleBinding
 import com.example.myapplication.model.CourseInstance
 import com.example.myapplication.model.CurriculumResponse
@@ -104,9 +108,106 @@ class ScheduleFragment : Fragment() {
             showSportsDialog()
         }
 
+        binding.tvCurrentWeek.setOnClickListener {
+            showWeekPickerDialog()
+        }
+
         binding.gridSchedule.setOnTouchListener { _, event ->
             handleSwipeGesture(event)
         }
+    }
+
+    private fun showWeekPickerDialog() {
+        val dialogBinding = DialogWeekPickerBinding.inflate(layoutInflater)
+        
+        val dialog = MaterialAlertDialogBuilder(requireContext())
+            .setView(dialogBinding.root)
+            .setBackgroundInsetStart(40)
+            .setBackgroundInsetEnd(40)
+            .setBackgroundInsetTop(20)
+            .setBackgroundInsetBottom(20)
+            .setCancelable(true)
+            .create()
+
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        
+        val weeks = (1..maxWeek).toList()
+        val adapter = WeekPickerAdapter(weeks) { }
+        
+        dialogBinding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
+        dialogBinding.recyclerView.adapter = adapter
+        
+        val snapHelper = LinearSnapHelper()
+        snapHelper.attachToRecyclerView(dialogBinding.recyclerView)
+        
+        dialogBinding.recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                if (newState == RecyclerView.SCROLL_STATE_IDLE) {
+                    val layoutManager = recyclerView.layoutManager as LinearLayoutManager
+                    val centerView = snapHelper.findSnapView(layoutManager)
+                    centerView?.let {
+                        val position = layoutManager.getPosition(it)
+                        adapter.setSelectedPosition(position)
+                    }
+                }
+            }
+        })
+        
+        val initialPosition = currentWeek - 1
+        dialogBinding.recyclerView.post {
+            dialogBinding.recyclerView.scrollToPosition(initialPosition)
+            adapter.setSelectedPosition(initialPosition)
+        }
+        
+        dialogBinding.btnCancel.setOnClickListener {
+            dialog.dismiss()
+        }
+        
+        dialogBinding.btnConfirm.setOnClickListener {
+            val selectedWeek = adapter.getSelectedWeek()
+            if (selectedWeek != currentWeek) {
+                jumpToWeek(selectedWeek)
+            }
+            dialog.dismiss()
+        }
+        
+        dialog.show()
+    }
+
+    private fun jumpToWeek(targetWeek: Int) {
+        if (isAnimating || targetWeek == currentWeek) return
+        
+        isAnimating = true
+        val gridLayout = binding.gridSchedule
+        val direction = if (targetWeek > currentWeek) -1 else 1
+        val width = gridLayout.width.toFloat()
+        
+        gridLayout.animate()
+            .translationX(direction * width)
+            .alpha(0f)
+            .setDuration(250)
+            .setListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    currentWeek = targetWeek
+                    updateWeekDisplay()
+                    renderSchedule()
+                    
+                    gridLayout.translationX = -direction * width
+                    gridLayout.alpha = 0f
+                    
+                    gridLayout.animate()
+                        .translationX(0f)
+                        .alpha(1f)
+                        .setDuration(250)
+                        .setListener(object : AnimatorListenerAdapter() {
+                            override fun onAnimationEnd(animation: Animator) {
+                                isAnimating = false
+                            }
+                        })
+                        .start()
+                }
+            })
+            .start()
     }
 
     private fun showSportsDialog() {
@@ -509,9 +610,19 @@ class ScheduleFragment : Fragment() {
                     }
 
                     val courseView = createCourseView(course, periodCount)
-                    courseView.setOnClickListener {
-                        showCourseDetailDialog(course)
+                    
+                    courseView.setOnTouchListener { _, event ->
+                        val handled = handleSwipeGesture(event)
+                        if (handled) {
+                            true
+                        } else {
+                            if (event.action == MotionEvent.ACTION_UP) {
+                                showCourseDetailDialog(course)
+                            }
+                            true
+                        }
                     }
+                    
                     val layoutParams = GridLayout.LayoutParams(
                         GridLayout.spec(period, periodCount, periodCount.toFloat()),
                         GridLayout.spec(day + 1, 1, 1f)
