@@ -600,11 +600,45 @@ class ScheduleFragment : Fragment() {
             }
         }
         
-        // 添加自定义日程到映射
+        // 添加自定义日程到映射，检查与现有课程和其他自定义日程的冲突
         val customScheduleStartMap = mutableMapOf<Pair<Int, Int>, Int>()
         for ((index, schedule) in weekCustomSchedules.withIndex()) {
-            val key = schedule.day to schedule.startPeriod
-            customScheduleStartMap[key] = index
+            val day = schedule.day
+            val startPeriod = schedule.startPeriod
+            val endPeriod = schedule.endPeriod
+            
+            // 检查是否与现有课程冲突
+            var hasConflict = false
+            for (period in startPeriod..endPeriod) {
+                val dayIndex = day - 1
+                if (dayIndex in 0 until 7 && period - 1 in 0 until 12) {
+                    // 检查该位置是否已被正常课程占用
+                    for (course in weekCourses) {
+                        if (course.day == day && period in course.periods) {
+                            hasConflict = true
+                            break
+                        }
+                    }
+                    if (hasConflict) break
+                }
+            }
+            
+            // 检查是否与其他自定义日程冲突
+            if (!hasConflict) {
+                for ((otherIndex, otherSchedule) in weekCustomSchedules.withIndex()) {
+                    if (index != otherIndex && otherSchedule.day == day) {
+                        if (startPeriod <= otherSchedule.endPeriod && endPeriod >= otherSchedule.startPeriod) {
+                            hasConflict = true
+                            break
+                        }
+                    }
+                }
+            }
+            
+            if (!hasConflict) {
+                val key = day to startPeriod
+                customScheduleStartMap[key] = index
+            }
         }
 
         for (period in 0 until 12) {
@@ -788,7 +822,7 @@ class ScheduleFragment : Fragment() {
             val nameView = TextView(context).apply {
                 text = schedule.title
                 textSize = if (periodCount >= 2) 9f else 8f
-                setTextColor(Color.parseColor("#1565C0"))
+                setTextColor(Color.parseColor("#0D47A1"))
                 gravity = Gravity.CENTER
                 setLines(2)
                 maxLines = 2
@@ -979,6 +1013,41 @@ class ScheduleFragment : Fragment() {
                 endPeriod = endPeriod,
                 weeks = weeks
             )
+            
+            // 检查冲突
+            var hasConflict = false
+            
+            // 检查与现有课程的冲突
+            val weekCourses = curriculumData?.instances
+                ?.filter { it.week == currentWeek }
+                ?: emptyList()
+            
+            for (period in startPeriod..endPeriod) {
+                for (course in weekCourses) {
+                    if (course.day == day && period in course.periods) {
+                        hasConflict = true
+                        break
+                    }
+                }
+                if (hasConflict) break
+            }
+            
+            // 检查与其他自定义日程的冲突
+            if (!hasConflict) {
+                for (existingSchedule in customSchedules) {
+                    if (existingSchedule.day == day) {
+                        if (startPeriod <= existingSchedule.endPeriod && endPeriod >= existingSchedule.startPeriod) {
+                            hasConflict = true
+                            break
+                        }
+                    }
+                }
+            }
+            
+            if (hasConflict) {
+                Toast.makeText(requireContext(), "该时间段已有课程或日程，无法添加", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
             
             cache.addCustomSchedule(schedule)
             customSchedules = cache.getCustomSchedules()

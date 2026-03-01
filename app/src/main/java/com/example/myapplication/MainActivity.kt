@@ -31,7 +31,7 @@ class MainActivity : AppCompatActivity() {
     
     private val networkService = NetworkService()
     private lateinit var cache: CurriculumCache
-    private val currentVersion = "v1.0.5"
+    private val currentVersion = "v1.0.6"
 
     private val PERMISSION_REQUEST_CODE = 1001
 
