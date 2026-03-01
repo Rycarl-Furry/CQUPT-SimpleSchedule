@@ -24,10 +24,12 @@ import com.example.myapplication.cache.CurriculumCache
 import com.example.myapplication.databinding.DialogCourseDetailBinding
 import com.example.myapplication.databinding.DialogSportsBinding
 import com.example.myapplication.databinding.DialogWeekPickerBinding
+import com.example.myapplication.databinding.DialogAddCustomScheduleBinding
 import com.example.myapplication.databinding.FragmentScheduleBinding
 import com.example.myapplication.model.CourseInstance
 import com.example.myapplication.model.CurriculumResponse
 import com.example.myapplication.model.SportsRecord
+import com.example.myapplication.model.CustomSchedule
 import com.example.myapplication.network.NetworkService
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.gson.Gson
@@ -66,9 +68,12 @@ class ScheduleFragment : Fragment() {
     private var touchStartY = 0f
     private val swipeThreshold = 100f
     private var isAnimating = false
+    private var lastClickTime = 0L
+    private val doubleClickThreshold = 300L
     
     private val networkService = NetworkService()
     private lateinit var cache: CurriculumCache
+    private var customSchedules: List<CustomSchedule> = emptyList()
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -82,6 +87,7 @@ class ScheduleFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         cache = CurriculumCache(requireContext())
+        customSchedules = cache.getCustomSchedules()
 
         val curriculumJson = arguments?.getString("curriculum_data")
         if (curriculumJson != null) {
@@ -114,6 +120,17 @@ class ScheduleFragment : Fragment() {
 
         binding.gridSchedule.setOnTouchListener { _, event ->
             handleSwipeGesture(event)
+        }
+        
+        // 双击添加自定义日程
+        binding.gridSchedule.setOnClickListener {
+            val currentTime = System.currentTimeMillis()
+            if (currentTime - lastClickTime < doubleClickThreshold) {
+                showAddCustomScheduleDialog()
+                lastClickTime = 0L
+            } else {
+                lastClickTime = currentTime
+            }
         }
     }
 
@@ -462,7 +479,7 @@ class ScheduleFragment : Fragment() {
             MotionEvent.ACTION_DOWN -> {
                 touchStartX = event.x
                 touchStartY = event.y
-                return true
+                return false // 不消费事件，让点击事件能触发
             }
             MotionEvent.ACTION_UP -> {
                 val deltaX = event.x - touchStartX
@@ -478,7 +495,7 @@ class ScheduleFragment : Fragment() {
                             animateWeekChange(false)
                         }
                     }
-                    return true
+                    return true // 消费滑动事件
                 }
             }
         }
@@ -562,6 +579,11 @@ class ScheduleFragment : Fragment() {
         val weekCourses = curriculumData?.instances
             ?.filter { it.week == currentWeek }
             ?: emptyList()
+        
+        // 过滤当前周的自定义日程
+        val weekCustomSchedules = customSchedules.filter { schedule ->
+            schedule.weeks.isEmpty() || currentWeek in schedule.weeks
+        }
 
         val occupiedCells = Array(12) { BooleanArray(7) { false } }
 
@@ -576,6 +598,13 @@ class ScheduleFragment : Fragment() {
                 courseColorMap[course.course] = color
                 colorIndex++
             }
+        }
+        
+        // 添加自定义日程到映射
+        val customScheduleStartMap = mutableMapOf<Pair<Int, Int>, Int>()
+        for ((index, schedule) in weekCustomSchedules.withIndex()) {
+            val key = schedule.day to schedule.startPeriod
+            customScheduleStartMap[key] = index
         }
 
         for (period in 0 until 12) {
@@ -599,6 +628,8 @@ class ScheduleFragment : Fragment() {
                 if (occupiedCells[period][day]) continue
 
                 val courseIndex = courseStartMap[day + 1 to period + 1]
+                val customScheduleIndex = customScheduleStartMap[day + 1 to period + 1]
+                
                 if (courseIndex != null) {
                     val course = weekCourses[courseIndex]
                     val periodCount = course.periods.size
@@ -633,6 +664,40 @@ class ScheduleFragment : Fragment() {
                     }
                     courseView.layoutParams = layoutParams
                     gridLayout.addView(courseView)
+                } else if (customScheduleIndex != null) {
+                    val schedule = weekCustomSchedules[customScheduleIndex]
+                    val periodCount = schedule.endPeriod - schedule.startPeriod + 1
+
+                    for (p in 0 until periodCount) {
+                        if (period + p < 12) {
+                            occupiedCells[period + p][day] = true
+                        }
+                    }
+
+                    val scheduleView = createCustomScheduleView(schedule, periodCount)
+                    
+                    scheduleView.setOnTouchListener { _, event ->
+                        val handled = handleSwipeGesture(event)
+                        if (handled) {
+                            true
+                        } else {
+                            if (event.action == MotionEvent.ACTION_UP) {
+                                showCustomScheduleDetailDialog(schedule)
+                            }
+                            true
+                        }
+                    }
+                    
+                    val layoutParams = GridLayout.LayoutParams(
+                        GridLayout.spec(period, periodCount, periodCount.toFloat()),
+                        GridLayout.spec(day + 1, 1, 1f)
+                    ).apply {
+                        width = 0
+                        height = 0
+                        setMargins(1, 1, 1, 1)
+                    }
+                    scheduleView.layoutParams = layoutParams
+                    gridLayout.addView(scheduleView)
                 } else {
                     val emptyView = View(requireContext()).apply {
                         layoutParams = GridLayout.LayoutParams(
@@ -700,6 +765,125 @@ class ScheduleFragment : Fragment() {
         }
     }
 
+    private fun createCustomScheduleView(schedule: CustomSchedule, periodCount: Int): View {
+        return LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2))
+            gravity = Gravity.CENTER
+
+            // 使用与正常课程相同的颜色
+            val color = courseColorMap[schedule.title] ?: run {
+                val color = Color.parseColor(courseColors[colorIndex % courseColors.size])
+                courseColorMap[schedule.title] = color
+                colorIndex++
+                color
+            }
+            val drawable = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = 6f
+                setColor(color)
+            }
+            background = drawable
+
+            val nameView = TextView(context).apply {
+                text = schedule.title
+                textSize = if (periodCount >= 2) 9f else 8f
+                setTextColor(Color.parseColor("#1565C0"))
+                gravity = Gravity.CENTER
+                setLines(2)
+                maxLines = 2
+            }
+            addView(nameView, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ))
+
+            if (periodCount >= 2 && schedule.location.isNotEmpty()) {
+                val locationView = TextView(context).apply {
+                    text = schedule.location
+                    textSize = 7f
+                    setTextColor(Color.parseColor("#666666"))
+                    gravity = Gravity.CENTER
+                    maxLines = 1
+                    setPadding(0, dpToPx(1), 0, 0)
+                }
+                addView(locationView, LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ))
+            }
+        }
+    }
+
+    private fun showCustomScheduleDetailDialog(schedule: CustomSchedule) {
+        val startTime = periodStartTimes.getOrElse(schedule.startPeriod - 1) { "" }
+        val endTime = periodEndTimes.getOrElse(schedule.endPeriod - 1) { "" }
+        val dayName = dayNames.getOrElse(schedule.day - 1) { "" }
+
+        val timeRange = if (schedule.startPeriod == schedule.endPeriod) {
+            "$dayName 第${schedule.startPeriod}节 (${startTime}-${endTime})"
+        } else {
+            "$dayName 第${schedule.startPeriod}-${schedule.endPeriod}节 (${startTime}-${endTime})"
+        }
+
+        val weeksText = if (schedule.weeks.isEmpty()) {
+            "所有周"
+        } else {
+            schedule.weeks.joinToString(", ") { "第${it}周" }
+        }
+
+        val dialogBinding = DialogCourseDetailBinding.inflate(layoutInflater)
+        
+        dialogBinding.tvCourseName.text = schedule.title
+        dialogBinding.tvTeacher.text = "自定义"
+        dialogBinding.tvLocation.text = schedule.location.ifEmpty { "无" }
+        dialogBinding.tvTime.text = timeRange
+        dialogBinding.tvType.text = weeksText
+
+        val dialog = MaterialAlertDialogBuilder(requireContext())
+            .setView(dialogBinding.root)
+            .setBackgroundInsetStart(40)
+            .setBackgroundInsetEnd(40)
+            .setBackgroundInsetTop(20)
+            .setBackgroundInsetBottom(20)
+            .create()
+
+        dialogBinding.btnClose.setOnClickListener {
+            dialog.dismiss()
+        }
+
+        // 添加删除按钮
+        val deleteButton = TextView(requireContext()).apply {
+            text = "删除"
+            textSize = 14f
+            setTextColor(Color.parseColor("#E53935"))
+            setPadding(dpToPx(16), dpToPx(8), dpToPx(16), dpToPx(8))
+            gravity = Gravity.CENTER
+            setOnClickListener {
+                cache.removeCustomSchedule(schedule.id)
+                customSchedules = cache.getCustomSchedules()
+                renderSchedule()
+                Toast.makeText(requireContext(), "日程已删除", Toast.LENGTH_SHORT).show()
+                dialog.dismiss()
+            }
+        }
+        
+        val buttonContainer = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+            gravity = Gravity.END
+            addView(deleteButton)
+        }
+        
+        (dialogBinding.root as ViewGroup).addView(buttonContainer)
+
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        dialog.show()
+    }
+
     private fun showCourseDetailDialog(course: CourseInstance) {
         val startPeriod = course.periods.minOrNull() ?: 1
         val endPeriod = course.periods.maxOrNull() ?: startPeriod
@@ -736,6 +920,106 @@ class ScheduleFragment : Fragment() {
 
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
         dialog.show()
+    }
+
+    private fun showAddCustomScheduleDialog() {
+        val dialogBinding = DialogAddCustomScheduleBinding.inflate(layoutInflater)
+        
+        val dialog = MaterialAlertDialogBuilder(requireContext())
+            .setView(dialogBinding.root)
+            .setBackgroundInsetStart(30)
+            .setBackgroundInsetEnd(30)
+            .setBackgroundInsetTop(20)
+            .setBackgroundInsetBottom(20)
+            .setCancelable(true)
+            .create()
+
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        
+        // 设置下拉选项
+        val days = arrayOf("周一", "周二", "周三", "周四", "周五", "周六", "周日")
+        val periods = (1..12).map { "第${it}节" }.toTypedArray()
+        
+        dialogBinding.etDay.setText(days[0])
+        dialogBinding.etDay.setSimpleItems(days)
+        dialogBinding.etStartPeriod.setText(periods[0])
+        dialogBinding.etStartPeriod.setSimpleItems(periods)
+        dialogBinding.etEndPeriod.setText(periods[0])
+        dialogBinding.etEndPeriod.setSimpleItems(periods)
+        
+        dialogBinding.btnCancel.setOnClickListener {
+            dialog.dismiss()
+        }
+        
+        dialogBinding.btnSave.setOnClickListener {
+            val title = dialogBinding.etTitle.text.toString().trim()
+            if (title.isEmpty()) {
+                Toast.makeText(requireContext(), "请输入日程标题", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            
+            val location = dialogBinding.etLocation.text.toString().trim()
+            val day = days.indexOf(dialogBinding.etDay.text.toString()) + 1
+            val startPeriod = periods.indexOf(dialogBinding.etStartPeriod.text.toString()) + 1
+            val endPeriod = periods.indexOf(dialogBinding.etEndPeriod.text.toString()) + 1
+            
+            if (endPeriod < startPeriod) {
+                Toast.makeText(requireContext(), "结束节次不能小于开始节次", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            
+            val weeksText = dialogBinding.etWeeks.text.toString().trim()
+            val weeks = parseWeeks(weeksText)
+            
+            val schedule = CustomSchedule(
+                title = title,
+                location = location,
+                day = day,
+                startPeriod = startPeriod,
+                endPeriod = endPeriod,
+                weeks = weeks
+            )
+            
+            cache.addCustomSchedule(schedule)
+            customSchedules = cache.getCustomSchedules()
+            renderSchedule()
+            dialog.dismiss()
+            Toast.makeText(requireContext(), "日程已添加", Toast.LENGTH_SHORT).show()
+        }
+        
+        dialog.show()
+    }
+    
+    private fun parseWeeks(text: String): List<Int> {
+        if (text.isEmpty()) return emptyList()
+        
+        val weeks = mutableListOf<Int>()
+        val parts = text.split(",")
+        
+        for (part in parts) {
+            val trimmed = part.trim()
+            if (trimmed.contains("-")) {
+                val range = trimmed.split("-")
+                if (range.size == 2) {
+                    val start = range[0].trim().toIntOrNull()
+                    val end = range[1].trim().toIntOrNull()
+                    if (start != null && end != null) {
+                        for (w in start..end) {
+                            if (w in 1..maxWeek) {
+                                weeks.add(w)
+                            }
+                        }
+                    }
+                }
+            } else {
+                val week = trimmed.toIntOrNull()
+                if (week != null && week in 1..maxWeek) {
+                    weeks.add(week)
+                }
+            }
+        }
+        
+        return weeks.distinct().sorted()
     }
 
     private fun dpToPx(dp: Int): Int {

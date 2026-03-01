@@ -134,4 +134,35 @@ class CurriculumCache(private val context: Context) {
     fun getLatestVersion(): String? {
         return prefs.getString("latest_version", null)
     }
+
+    fun saveCustomSchedules(schedules: List<com.example.myapplication.model.CustomSchedule>) {
+        val json = gson.toJson(schedules.map { it.toMap() })
+        prefs.edit()
+            .putString("custom_schedules", json)
+            .apply()
+    }
+
+    fun getCustomSchedules(): List<com.example.myapplication.model.CustomSchedule> {
+        val json = prefs.getString("custom_schedules", null) ?: return emptyList()
+        return try {
+            val list = gson.fromJson(json, List::class.java)
+            list.mapNotNull { item ->
+                @Suppress("UNCHECKED_CAST")
+                com.example.myapplication.model.CustomSchedule.fromMap(item as Map<String, Any>)
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    fun addCustomSchedule(schedule: com.example.myapplication.model.CustomSchedule) {
+        val schedules = getCustomSchedules().toMutableList()
+        schedules.add(schedule)
+        saveCustomSchedules(schedules)
+    }
+
+    fun removeCustomSchedule(scheduleId: String) {
+        val schedules = getCustomSchedules().filter { it.id != scheduleId }
+        saveCustomSchedules(schedules)
+    }
 }
