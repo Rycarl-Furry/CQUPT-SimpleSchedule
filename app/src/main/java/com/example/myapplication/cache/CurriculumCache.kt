@@ -114,4 +114,24 @@ class CurriculumCache(private val context: Context) {
     fun clear() {
         prefs.edit().clear().apply()
     }
+
+    fun saveUpdateAvailable(available: Boolean) {
+        prefs.edit()
+            .putBoolean("update_available", available)
+            .apply()
+    }
+
+    fun isUpdateAvailable(): Boolean {
+        return prefs.getBoolean("update_available", false)
+    }
+
+    fun saveLatestVersion(version: String) {
+        prefs.edit()
+            .putString("latest_version", version)
+            .apply()
+    }
+
+    fun getLatestVersion(): String? {
+        return prefs.getString("latest_version", null)
+    }
 }

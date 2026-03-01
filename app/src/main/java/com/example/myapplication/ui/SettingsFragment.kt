@@ -12,6 +12,7 @@ import androidx.lifecycle.lifecycleScope
 import com.example.myapplication.LoginActivity
 import com.example.myapplication.cache.CurriculumCache
 import com.example.myapplication.databinding.DialogAboutBinding
+import com.example.myapplication.databinding.DialogDownloadProgressBinding
 import com.example.myapplication.databinding.DialogIdsLoginBinding
 import com.example.myapplication.databinding.FragmentSettingsBinding
 import com.example.myapplication.network.NetworkService
@@ -49,6 +50,18 @@ class SettingsFragment : Fragment() {
         setupAbout()
         setupLogout()
         updateIdsStatus()
+        updateUpdateStatus()
+    }
+
+    private fun updateUpdateStatus() {
+        if (cache.isUpdateAvailable()) {
+            val latestVersion = cache.getLatestVersion()
+            binding.tvCurrentVersion.text = "$currentVersion (有更新: $latestVersion)"
+            binding.tvCurrentVersion.setTextColor(android.graphics.Color.parseColor("#E53935"))
+        } else {
+            binding.tvCurrentVersion.text = currentVersion
+            binding.tvCurrentVersion.setTextColor(android.graphics.Color.parseColor("#888888"))
+        }
     }
 
     private fun setupIdsLogin() {
@@ -169,8 +182,15 @@ class SettingsFragment : Fragment() {
             result.fold(
                 onSuccess = { versionInfo ->
                     if (versionInfo.version != currentVersion) {
+                        // 保存更新状态
+                        cache.saveUpdateAvailable(true)
+                        cache.saveLatestVersion(versionInfo.version)
+                        updateUpdateStatus()
                         showUpdateDialog(versionInfo)
                     } else {
+                        // 清除更新状态
+                        cache.saveUpdateAvailable(false)
+                        updateUpdateStatus()
                         Toast.makeText(requireContext(), "已是最新版本", Toast.LENGTH_SHORT).show()
                     }
                 },
@@ -194,18 +214,145 @@ class SettingsFragment : Fragment() {
                 append(versionInfo.updateContent)
                 append("\n\n")
             }
-            append("是否前往GitHub下载?")
+            append("是否自动下载并安装更新?")
         }
         
         MaterialAlertDialogBuilder(requireContext())
             .setTitle("发现新版本")
             .setMessage(message)
-            .setPositiveButton("前往下载") { _, _ ->
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Rycarl-Furry/CQUPT-SimpleSchedule/releases"))
-                startActivity(intent)
+            .setPositiveButton("下载安装") { _, _ ->
+                downloadAndInstallUpdate()
             }
             .setNegativeButton("稍后提醒", null)
             .show()
+    }
+
+    private val notificationId = 1001
+    private lateinit var notificationManager: android.app.NotificationManager
+    private lateinit var notificationBuilder: android.app.Notification.Builder
+    private var downloadDialog: android.app.Dialog? = null
+
+    private fun downloadAndInstallUpdate() {
+        notificationManager = requireContext().getSystemService(android.app.NotificationManager::class.java)
+        
+        // 创建通知渠道
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            val channel = android.app.NotificationChannel(
+                "update_channel",
+                "更新通知",
+                android.app.NotificationManager.IMPORTANCE_LOW
+            )
+            notificationManager.createNotificationChannel(channel)
+        }
+        
+        // 创建通知
+        notificationBuilder = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            android.app.Notification.Builder(requireContext(), "update_channel")
+        } else {
+            android.app.Notification.Builder(requireContext())
+        }
+        
+        notificationBuilder
+            .setSmallIcon(android.R.drawable.stat_sys_download)
+            .setContentTitle("应用更新")
+            .setContentText("正在下载更新...")
+            .setProgress(100, 0, false)
+            .setOngoing(true)
+        
+        // 显示通知
+        notificationManager.notify(notificationId, notificationBuilder.build())
+        
+        // 创建并显示进度对话框
+        val dialogBinding = DialogDownloadProgressBinding.inflate(layoutInflater)
+        downloadDialog = MaterialAlertDialogBuilder(requireContext())
+            .setView(dialogBinding.root)
+            .setBackgroundInsetStart(40)
+            .setBackgroundInsetEnd(40)
+            .setBackgroundInsetTop(20)
+            .setBackgroundInsetBottom(20)
+            .setCancelable(false)
+            .create()
+        
+        downloadDialog?.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        downloadDialog?.show()
+        
+        lifecycleScope.launch {
+            try {
+                val result = networkService.downloadApk(requireContext()) { progress ->
+                    // 在主线程中更新UI
+                    activity?.runOnUiThread {
+                        // 更新通知进度
+                        notificationBuilder.setProgress(100, progress, false)
+                        notificationBuilder.setContentText("正在下载更新... $progress%")
+                        notificationManager.notify(notificationId, notificationBuilder.build())
+                        
+                        // 更新对话框进度
+                        dialogBinding.progressBar.progress = progress
+                        dialogBinding.tvProgress.text = "$progress%"
+                    }
+                }
+                
+                result.fold(
+                    onSuccess = { apkFile ->
+                        // 在主线程中更新UI
+                        activity?.runOnUiThread {
+                            // 关闭进度对话框
+                            downloadDialog?.dismiss()
+                            
+                            // 下载完成，更新通知
+                            notificationBuilder.setContentText("下载完成，正在安装...")
+                            notificationBuilder.setProgress(0, 0, false)
+                            notificationBuilder.setOngoing(false)
+                            notificationManager.notify(notificationId, notificationBuilder.build())
+                            
+                            // 安装APK
+                            networkService.installApk(requireContext(), apkFile)
+                            
+                            // 清除更新状态
+                            cache.saveUpdateAvailable(false)
+                            updateUpdateStatus()
+                        }
+                    },
+                    onFailure = { error ->
+                        // 在主线程中更新UI
+                        activity?.runOnUiThread {
+                            // 关闭进度对话框
+                            downloadDialog?.dismiss()
+                            
+                            // 下载失败，更新通知
+                            notificationBuilder.setContentText("下载失败: ${error.message}")
+                            notificationBuilder.setProgress(0, 0, false)
+                            notificationBuilder.setOngoing(false)
+                            notificationManager.notify(notificationId, notificationBuilder.build())
+                            
+                            Toast.makeText(
+                                requireContext(),
+                                "下载失败: ${error.message}",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                )
+            } catch (e: Exception) {
+                // 在主线程中更新UI
+                activity?.runOnUiThread {
+                    // 关闭进度对话框
+                    downloadDialog?.dismiss()
+                    
+                    // 捕获异常，防止闪退
+                    notificationBuilder.setContentText("下载失败: ${e.message}")
+                    notificationBuilder.setProgress(0, 0, false)
+                    notificationBuilder.setOngoing(false)
+                    notificationManager.notify(notificationId, notificationBuilder.build())
+                    
+                    Toast.makeText(
+                        requireContext(),
+                        "下载失败: ${e.message}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        }
     }
 
     private fun setupAbout() {

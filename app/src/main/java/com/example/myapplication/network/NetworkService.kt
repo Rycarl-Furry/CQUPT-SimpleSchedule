@@ -160,4 +160,58 @@ class NetworkService {
             Result.failure(e)
         }
     }
+
+    suspend fun downloadApk(context: android.content.Context, progressCallback: ((Int) -> Unit)? = null): Result<java.io.File> = withContext(Dispatchers.IO) {
+        try {
+            val url = "https://rycarl.cn/SimpleSchedule.apk"
+            val request = Request.Builder().url(url).build()
+            val response = client.newCall(request).execute()
+            if (!response.isSuccessful) {
+                return@withContext Result.failure(IOException("下载失败: ${response.code}"))
+            }
+            
+            val apkFile = java.io.File(context.externalCacheDir, "SimpleSchedule.apk")
+            val outputStream = java.io.FileOutputStream(apkFile)
+            val inputStream = response.body?.byteStream() ?: return@withContext Result.failure(IOException("响应体为空"))
+            
+            val totalSize = response.body?.contentLength() ?: 0
+            var downloadedSize = 0L
+            val buffer = ByteArray(8192)
+            var bytesRead: Int
+            
+            while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                outputStream.write(buffer, 0, bytesRead)
+                downloadedSize += bytesRead
+                if (totalSize > 0) {
+                    val progress = ((downloadedSize * 100) / totalSize).toInt()
+                    progressCallback?.invoke(progress)
+                }
+            }
+            
+            outputStream.close()
+            inputStream.close()
+            
+            Result.success(apkFile)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    fun installApk(context: android.content.Context, apkFile: java.io.File) {
+        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW)
+        val uri = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+            // 使用FileProvider获取URI
+            androidx.core.content.FileProvider.getUriForFile(
+                context,
+                "com.example.myapplication.fileprovider",
+                apkFile
+            )
+        } else {
+            // 旧版本使用Uri.fromFile
+            android.net.Uri.fromFile(apkFile)
+        }
+        intent.setDataAndType(uri, "application/vnd.android.package-archive")
+        intent.flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+        context.startActivity(intent)
+    }
 }

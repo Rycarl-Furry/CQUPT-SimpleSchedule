@@ -1,5 +1,6 @@
 package com.example.myapplication
 
+import android.Manifest
 import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -16,6 +17,9 @@ import com.example.myapplication.ui.SettingsFragment
 import com.google.android.material.navigation.NavigationBarView
 import com.google.gson.Gson
 import kotlinx.coroutines.launch
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import android.content.pm.PackageManager
 
 class MainActivity : AppCompatActivity() {
 
@@ -27,6 +31,9 @@ class MainActivity : AppCompatActivity() {
     
     private val networkService = NetworkService()
     private lateinit var cache: CurriculumCache
+    private val currentVersion = "v1.0.5"
+
+    private val PERMISSION_REQUEST_CODE = 1001
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -52,6 +59,43 @@ class MainActivity : AppCompatActivity() {
         }
         
         performAutoIdsLogin()
+        
+        // 检查权限
+        checkPermissions()
+    }
+
+    private fun checkPermissions() {
+        val permissions = mutableListOf<String>()
+        
+        // 检查安装未知来源应用的权限
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            if (!packageManager.canRequestPackageInstalls()) {
+                permissions.add(Manifest.permission.REQUEST_INSTALL_PACKAGES)
+            }
+        }
+        
+        // 检查存储权限（仅在Android 13以下）
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            }
+        }
+        
+        if (permissions.isNotEmpty()) {
+            ActivityCompat.requestPermissions(this, permissions.toTypedArray(), PERMISSION_REQUEST_CODE)
+        } else {
+            // 权限已获取，开始后台检测更新
+            checkUpdateInBackground()
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == PERMISSION_REQUEST_CODE) {
+            // 无论权限是否获取，都开始后台检测更新
+            // 即使没有权限，也可以检测更新，只是下载和安装可能会失败
+            checkUpdateInBackground()
+        }
     }
 
     private fun performAutoIdsLogin() {
@@ -68,6 +112,38 @@ class MainActivity : AppCompatActivity() {
                     )
                 }
             }
+        }
+    }
+
+    private fun checkUpdateInBackground() {
+        lifecycleScope.launch {
+            val result = networkService.fetchLatestVersion()
+            result.fold(
+                onSuccess = { versionInfo ->
+                    if (versionInfo.version != currentVersion) {
+                        // 保存更新状态
+                        cache.saveUpdateAvailable(true)
+                        cache.saveLatestVersion(versionInfo.version)
+                        // 不自动下载，仅保存状态
+                    } else {
+                        // 清除更新状态
+                        cache.saveUpdateAvailable(false)
+                    }
+                },
+                onFailure = { }
+            )
+        }
+    }
+
+    private fun downloadAndInstallUpdate() {
+        lifecycleScope.launch {
+            val result = networkService.downloadApk(this@MainActivity)
+            result.fold(
+                onSuccess = { apkFile ->
+                    networkService.installApk(this@MainActivity, apkFile)
+                },
+                onFailure = { }
+            )
         }
     }
 
