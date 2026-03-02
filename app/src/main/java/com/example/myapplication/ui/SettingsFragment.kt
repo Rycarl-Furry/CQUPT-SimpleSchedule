@@ -14,9 +14,11 @@ import com.example.myapplication.cache.CurriculumCache
 import com.example.myapplication.databinding.DialogAboutBinding
 import com.example.myapplication.databinding.DialogDownloadProgressBinding
 import com.example.myapplication.databinding.DialogIdsLoginBinding
+import com.example.myapplication.databinding.DialogXzcyLoginBinding
 import com.example.myapplication.databinding.FragmentSettingsBinding
 import com.example.myapplication.Constants
 import com.example.myapplication.network.NetworkService
+import com.example.myapplication.model.XzcyLoginRequest
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.launch
 
@@ -47,11 +49,13 @@ class SettingsFragment : Fragment() {
         binding.tvVersion.text = "SimpleSchedule $currentVersion"
         
         setupIdsLogin()
+        setupXzcyLogin()
         setupCheckUpdate()
         setupAbout()
         setupLogout()
         setupFontSize()
         updateIdsStatus()
+        updateXzcyStatus()
         updateUpdateStatus()
     }
     
@@ -214,6 +218,98 @@ class SettingsFragment : Fragment() {
         } else {
             binding.tvIdsStatus.text = "未登录"
             binding.tvIdsStatus.setTextColor(android.graphics.Color.parseColor("#888888"))
+        }
+    }
+
+    private fun setupXzcyLogin() {
+        binding.btnXzcyLogin.setOnClickListener {
+            showXzcyLoginDialog()
+        }
+    }
+
+    private fun showXzcyLoginDialog() {
+        val dialogBinding = DialogXzcyLoginBinding.inflate(layoutInflater)
+        
+        val dialog = MaterialAlertDialogBuilder(requireContext())
+            .setView(dialogBinding.root)
+            .setBackgroundInsetStart(40)
+            .setBackgroundInsetEnd(40)
+            .setBackgroundInsetTop(20)
+            .setBackgroundInsetBottom(20)
+            .setCancelable(true)
+            .create()
+
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        
+        dialogBinding.btnCancel.setOnClickListener {
+            dialog.dismiss()
+        }
+        
+        dialogBinding.btnLogin.setOnClickListener {
+            val uid = dialogBinding.etUid.text.toString().trim()
+            val password = dialogBinding.etPassword.text.toString().trim()
+            
+            if (uid.isEmpty()) {
+                Toast.makeText(requireContext(), "请输入统一认证码", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            
+            if (password.isEmpty()) {
+                Toast.makeText(requireContext(), "请输入密码", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            
+            performXzcyLogin(uid, password, dialog, dialogBinding)
+        }
+        
+        dialog.show()
+    }
+
+    private fun performXzcyLogin(
+        uid: String, 
+        password: String, 
+        dialog: android.app.Dialog,
+        dialogBinding: DialogXzcyLoginBinding
+    ) {
+        dialogBinding.btnLogin.isEnabled = false
+        dialogBinding.btnLogin.text = "登录中..."
+        
+        lifecycleScope.launch {
+            val result = networkService.xzcyLogin(XzcyLoginRequest(uid, password))
+            
+            dialogBinding.btnLogin.isEnabled = true
+            dialogBinding.btnLogin.text = "登录"
+            
+            result.fold(
+                onSuccess = { response ->
+                    if (response.success) {
+                        cache.saveXzcySession(response.session ?: "")
+                        dialog.dismiss()
+                        updateXzcyStatus()
+                        Toast.makeText(requireContext(), "登录成功", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(requireContext(), response.message, Toast.LENGTH_SHORT).show()
+                    }
+                },
+                onFailure = { error ->
+                    Toast.makeText(
+                        requireContext(),
+                        "登录失败: ${error.message}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            )
+        }
+    }
+
+    private fun updateXzcyStatus() {
+        val session = cache.getXzcySession()
+        if (session != null) {
+            binding.tvXzcyStatus.text = "已登录"
+            binding.tvXzcyStatus.setTextColor(android.graphics.Color.parseColor("#4CAF50"))
+        } else {
+            binding.tvXzcyStatus.text = "未登录"
+            binding.tvXzcyStatus.setTextColor(android.graphics.Color.parseColor("#888888"))
         }
     }
 

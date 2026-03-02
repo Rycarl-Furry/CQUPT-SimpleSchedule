@@ -13,12 +13,14 @@ import com.example.myapplication.cache.CurriculumCache
 import com.example.myapplication.databinding.ActivityMainBinding
 import com.example.myapplication.model.CurriculumResponse
 import com.example.myapplication.network.NetworkService
-import com.example.myapplication.LoginActivity
+import com.example.myapplication.ui.CheckinFragment
 import com.example.myapplication.ui.ExamFragment
+import com.example.myapplication.ui.MoreFragment
 import com.example.myapplication.ui.NoticeFragment
 import com.example.myapplication.ui.ScheduleFragment
 import com.example.myapplication.Constants
 import com.example.myapplication.ui.SettingsFragment
+import com.example.myapplication.widget.WidgetUpdater
 import com.google.android.material.navigation.NavigationBarView
 import com.google.gson.Gson
 import kotlinx.coroutines.launch
@@ -41,13 +43,11 @@ class MainActivity : AppCompatActivity() {
     private val PERMISSION_REQUEST_CODE = 1001
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // 先还原主题，因为启动时使用了SplashTheme
         setTheme(R.style.Theme_MyApplication)
         super.onCreate(savedInstanceState)
         
         cache = CurriculumCache(this)
         
-        // 检查缓存
         val lastLoginId = cache.getLastLogin()
         if (lastLoginId != null && cache.hasCache(lastLoginId)) {
             val cachedData = cache.get(lastLoginId)
@@ -66,17 +66,16 @@ class MainActivity : AppCompatActivity() {
                     showScheduleFragment()
                 }
                 
-                // 延迟执行非必要操作，优先显示界面
                 Handler(Looper.getMainLooper()).post {
                     refreshInBackground(studentId!!)
                     performAutoIdsLogin()
                     checkPermissions()
+                    WidgetUpdater.updateAllWidgets(this@MainActivity)
                 }
                 return
             }
         }
         
-        // 无缓存，跳转到登录界面
         val intent = Intent(this, LoginActivity::class.java)
         startActivity(intent)
         finish()
@@ -85,14 +84,12 @@ class MainActivity : AppCompatActivity() {
     private fun checkPermissions() {
         val permissions = mutableListOf<String>()
         
-        // 检查安装未知来源应用的权限
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             if (!packageManager.canRequestPackageInstalls()) {
                 permissions.add(Manifest.permission.REQUEST_INSTALL_PACKAGES)
             }
         }
         
-        // 检查存储权限（仅在Android 13以下）
         if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
                 permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
@@ -102,7 +99,6 @@ class MainActivity : AppCompatActivity() {
         if (permissions.isNotEmpty()) {
             ActivityCompat.requestPermissions(this, permissions.toTypedArray(), PERMISSION_REQUEST_CODE)
         } else {
-            // 权限已获取，开始后台检测更新
             checkUpdateInBackground()
         }
     }
@@ -110,8 +106,6 @@ class MainActivity : AppCompatActivity() {
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == PERMISSION_REQUEST_CODE) {
-            // 无论权限是否获取，都开始后台检测更新
-            // 即使没有权限，也可以检测更新，只是下载和安装可能会失败
             checkUpdateInBackground()
         }
     }
@@ -139,26 +133,11 @@ class MainActivity : AppCompatActivity() {
             result.fold(
                 onSuccess = { versionInfo ->
                     if (versionInfo.version != currentVersion) {
-                        // 保存更新状态
                         cache.saveUpdateAvailable(true)
                         cache.saveLatestVersion(versionInfo.version)
-                        // 不自动下载，仅保存状态
                     } else {
-                        // 清除更新状态
                         cache.saveUpdateAvailable(false)
                     }
-                },
-                onFailure = { }
-            )
-        }
-    }
-
-    private fun downloadAndInstallUpdate() {
-        lifecycleScope.launch {
-            val result = networkService.downloadApk(this@MainActivity)
-            result.fold(
-                onSuccess = { apkFile ->
-                    networkService.installApk(this@MainActivity, apkFile)
                 },
                 onFailure = { }
             )
@@ -176,9 +155,11 @@ class MainActivity : AppCompatActivity() {
                         curriculumData = newCurriculum
                         curriculumJson = Gson().toJson(newCurriculum)
                         updateCurrentFragment()
+                        WidgetUpdater.updateAllWidgets(this@MainActivity)
                         Toast.makeText(this@MainActivity, "课表已更新", Toast.LENGTH_SHORT).show()
                     } else if (cachedData == null) {
                         cache.save(studentId, newCurriculum)
+                        WidgetUpdater.updateAllWidgets(this@MainActivity)
                     }
                 },
                 onFailure = { }
@@ -203,6 +184,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun getCurriculumJson(): String? = curriculumJson
+    fun getStudentId(): String? = studentId
 
     private fun setupBottomNavigation() {
         binding.bottomNavigation.labelVisibilityMode = NavigationBarView.LABEL_VISIBILITY_LABELED
@@ -215,8 +197,8 @@ class MainActivity : AppCompatActivity() {
             val oldNavId = currentNavId
             val fragment: Fragment = when (item.itemId) {
                 R.id.nav_schedule -> ScheduleFragment.newInstance(curriculumJson ?: "")
-                R.id.nav_notice -> NoticeFragment.newInstance()
-                R.id.nav_exam -> ExamFragment.newInstance(studentId ?: "")
+                R.id.nav_checkin -> CheckinFragment.newInstance()
+                R.id.nav_more -> MoreFragment.newInstance()
                 R.id.nav_settings -> SettingsFragment.newInstance()
                 else -> return@setOnItemSelectedListener false
             }
@@ -230,8 +212,8 @@ class MainActivity : AppCompatActivity() {
     private fun getNavOrder(navId: Int): Int {
         return when (navId) {
             R.id.nav_schedule -> 0
-            R.id.nav_notice -> 1
-            R.id.nav_exam -> 2
+            R.id.nav_checkin -> 1
+            R.id.nav_more -> 2
             R.id.nav_settings -> 3
             else -> 0
         }
@@ -245,11 +227,9 @@ class MainActivity : AppCompatActivity() {
         val exitAnim: Int
         
         if (newOrder > oldOrder) {
-            // 向右滑动（新页面从右边进入，旧页面向左退出）
             enterAnim = R.anim.slide_in_right
             exitAnim = R.anim.slide_out_left
         } else {
-            // 向左滑动（新页面从左边进入，旧页面向右退出）
             enterAnim = R.anim.slide_in_left
             exitAnim = R.anim.slide_out_right
         }
@@ -264,27 +244,6 @@ class MainActivity : AppCompatActivity() {
         val fragment = ScheduleFragment.newInstance(curriculumJson ?: "")
         supportFragmentManager.beginTransaction()
             .setCustomAnimations(R.anim.fade_in_smooth, 0, 0, 0)
-            .replace(R.id.fragmentContainer, fragment)
-            .commit()
-    }
-
-    private fun showNoticeFragment() {
-        val fragment = NoticeFragment.newInstance()
-        replaceFragment(fragment)
-    }
-
-    private fun showExamFragment() {
-        val fragment = ExamFragment.newInstance(studentId ?: "")
-        replaceFragment(fragment)
-    }
-
-    private fun showSettingsFragment() {
-        val fragment = SettingsFragment.newInstance()
-        replaceFragment(fragment)
-    }
-
-    private fun replaceFragment(fragment: Fragment) {
-        supportFragmentManager.beginTransaction()
             .replace(R.id.fragmentContainer, fragment)
             .commit()
     }

@@ -39,6 +39,10 @@ class SportsFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         cache = CurriculumCache(requireContext())
         
+        binding.btnBack.setOnClickListener {
+            parentFragmentManager.popBackStack()
+        }
+        
         loadSportsData()
     }
 

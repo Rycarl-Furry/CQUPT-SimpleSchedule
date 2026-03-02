@@ -175,4 +175,20 @@ class CurriculumCache(private val context: Context) {
     fun getFontSize(): Float {
         return prefs.getFloat("font_size", 1.0f)
     }
+    
+    fun saveXzcySession(session: String) {
+        prefs.edit()
+            .putString("xzcy_session", session)
+            .apply()
+    }
+    
+    fun getXzcySession(): String? {
+        return prefs.getString("xzcy_session", null)
+    }
+    
+    fun clearXzcySession() {
+        prefs.edit()
+            .remove("xzcy_session")
+            .apply()
+    }
 }

@@ -11,6 +11,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import com.example.myapplication.MainActivity
 import com.example.myapplication.databinding.FragmentNoticeBinding
 import com.example.myapplication.model.Notice
 import com.example.myapplication.network.NetworkService
@@ -29,8 +30,17 @@ class NoticeFragment : Fragment() {
         savedInstanceState: Bundle?
     ): View {
         _binding = FragmentNoticeBinding.inflate(inflater, container, false)
-        loadNotices()
         return binding.root
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        
+        binding.btnBack.setOnClickListener {
+            navigateBack()
+        }
+        
+        loadNotices()
     }
 
     private fun loadNotices() {
@@ -97,6 +107,7 @@ class NoticeFragment : Fragment() {
                 text = notice.date
                 textSize = 12f
                 setTextColor(android.graphics.Color.parseColor("#888888"))
+                setPadding(0, 0, 0, dpToPx(8))
             }
             addView(dateView)
         }
@@ -105,6 +116,10 @@ class NoticeFragment : Fragment() {
     private fun openNoticeUrl(url: String) {
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
         startActivity(intent)
+    }
+
+    private fun navigateBack() {
+        parentFragmentManager.popBackStack()
     }
 
     private fun dpToPx(dp: Int): Int {

@@ -47,6 +47,10 @@ class ExamFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         cache = CurriculumCache(requireContext())
         
+        binding.btnBack.setOnClickListener {
+            parentFragmentManager.popBackStack()
+        }
+        
         if (studentId != null) {
             loadExams(studentId!!)
         } else {

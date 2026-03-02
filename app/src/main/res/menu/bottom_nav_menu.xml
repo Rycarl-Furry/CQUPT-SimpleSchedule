@@ -7,14 +7,14 @@
         android:title="课表" />
 
     <item
-        android:id="@+id/nav_notice"
-        android:icon="@drawable/ic_notice"
-        android:title="教务通知" />
+        android:id="@+id/nav_checkin"
+        android:icon="@drawable/ic_checkin"
+        android:title="上课签到" />
 
     <item
-        android:id="@+id/nav_exam"
-        android:icon="@drawable/ic_exam"
-        android:title="考试安排" />
+        android:id="@+id/nav_more"
+        android:icon="@drawable/ic_more"
+        android:title="更多功能" />
 
     <item
         android:id="@+id/nav_settings"

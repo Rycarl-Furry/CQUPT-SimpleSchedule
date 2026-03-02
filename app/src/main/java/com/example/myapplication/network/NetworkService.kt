@@ -6,6 +6,8 @@ import com.example.myapplication.model.LoginRequest
 import com.example.myapplication.model.LoginResponse
 import com.example.myapplication.model.Notice
 import com.example.myapplication.model.SportsResponse
+import com.example.myapplication.model.XzcyLoginRequest
+import com.example.myapplication.model.XzcyLoginResponse
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -213,5 +215,27 @@ class NetworkService {
         intent.setDataAndType(uri, "application/vnd.android.package-archive")
         intent.flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
         context.startActivity(intent)
+    }
+    
+    suspend fun xzcyLogin(request: XzcyLoginRequest): Result<XzcyLoginResponse> = withContext(Dispatchers.IO) {
+        try {
+            val url = "https://xzcy.rycarl.cn/api/login/password"
+            val jsonBody = gson.toJson(request)
+            val body = jsonBody.toRequestBody(jsonMediaType)
+            val httpRequest = Request.Builder()
+                .url(url)
+                .post(body)
+                .build()
+            val response = client.newCall(httpRequest).execute()
+            if (!response.isSuccessful) {
+                return@withContext Result.failure(IOException("请求失败: ${response.code}"))
+            }
+            val responseBody = response.body?.string()
+                ?: return@withContext Result.failure(IOException("响应体为空"))
+            val loginResponse = gson.fromJson(responseBody, XzcyLoginResponse::class.java)
+            Result.success(loginResponse)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 }
