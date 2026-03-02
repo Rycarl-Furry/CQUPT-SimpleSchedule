@@ -28,3 +28,34 @@ data class CheckinResponse(
     val success: Boolean,
     val message: String
 )
+
+data class RollcallsRequest(
+    val session: String
+)
+
+data class QrCheckinRequest(
+    val session: String,
+    val rollcall_id: Int,
+    val code: String
+)
+
+data class NumberCheckinRequest(
+    val session: String,
+    val rollcall_id: Int,
+    val number: String
+)
+
+data class LocationData(
+    val latitude: Double,
+    val longitude: Double,
+    val altitude: Double,
+    val accuracy: Double,
+    val verticalAccuracy: Double,
+    val speed: Double
+)
+
+data class RadarCheckinRequest(
+    val session: String,
+    val rollcall_id: Int,
+    val location: LocationData
+)

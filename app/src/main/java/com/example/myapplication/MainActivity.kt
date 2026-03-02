@@ -185,6 +185,10 @@ class MainActivity : AppCompatActivity() {
 
     fun getCurriculumJson(): String? = curriculumJson
     fun getStudentId(): String? = studentId
+    
+    fun navigateToSettings() {
+        binding.bottomNavigation.selectedItemId = R.id.nav_settings
+    }
 
     private fun setupBottomNavigation() {
         binding.bottomNavigation.labelVisibilityMode = NavigationBarView.LABEL_VISIBILITY_LABELED

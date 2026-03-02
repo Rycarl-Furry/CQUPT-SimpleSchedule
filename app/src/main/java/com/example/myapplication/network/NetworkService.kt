@@ -8,6 +8,12 @@ import com.example.myapplication.model.Notice
 import com.example.myapplication.model.SportsResponse
 import com.example.myapplication.model.XzcyLoginRequest
 import com.example.myapplication.model.XzcyLoginResponse
+import com.example.myapplication.model.RollcallsRequest
+import com.example.myapplication.model.RollcallResponse
+import com.example.myapplication.model.QrCheckinRequest
+import com.example.myapplication.model.NumberCheckinRequest
+import com.example.myapplication.model.RadarCheckinRequest
+import com.example.myapplication.model.CheckinResponse
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -217,6 +223,11 @@ class NetworkService {
         context.startActivity(intent)
     }
     
+    private data class ErrorResponse(
+        val success: Boolean?,
+        val message: String?
+    )
+
     suspend fun xzcyLogin(request: XzcyLoginRequest): Result<XzcyLoginResponse> = withContext(Dispatchers.IO) {
         try {
             val url = "https://xzcy.rycarl.cn/api/login/password"
@@ -227,15 +238,127 @@ class NetworkService {
                 .post(body)
                 .build()
             val response = client.newCall(httpRequest).execute()
-            if (!response.isSuccessful) {
-                return@withContext Result.failure(IOException("请求失败: ${response.code}"))
-            }
             val responseBody = response.body?.string()
                 ?: return@withContext Result.failure(IOException("响应体为空"))
+            
+            if (!response.isSuccessful) {
+                val errorResponse = tryParseErrorResponse(responseBody, response.code)
+                return@withContext Result.failure(IOException(errorResponse))
+            }
+            
             val loginResponse = gson.fromJson(responseBody, XzcyLoginResponse::class.java)
             Result.success(loginResponse)
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+    
+    suspend fun fetchRollcalls(session: String): Result<RollcallResponse> = withContext(Dispatchers.IO) {
+        try {
+            val url = "https://xzcy.rycarl.cn/api/rollcalls"
+            val jsonBody = gson.toJson(RollcallsRequest(session))
+            val body = jsonBody.toRequestBody(jsonMediaType)
+            val httpRequest = Request.Builder()
+                .url(url)
+                .post(body)
+                .build()
+            val response = client.newCall(httpRequest).execute()
+            val responseBody = response.body?.string()
+                ?: return@withContext Result.failure(IOException("响应体为空"))
+            
+            if (!response.isSuccessful) {
+                val errorResponse = tryParseErrorResponse(responseBody, response.code)
+                return@withContext Result.failure(IOException(errorResponse))
+            }
+            
+            val rollcallResponse = gson.fromJson(responseBody, RollcallResponse::class.java)
+            Result.success(rollcallResponse)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
+    suspend fun qrCheckin(session: String, rollcallId: Int, code: String): Result<CheckinResponse> = withContext(Dispatchers.IO) {
+        try {
+            val url = "https://xzcy.rycarl.cn/api/checkin/qr"
+            val jsonBody = gson.toJson(QrCheckinRequest(session, rollcallId, code))
+            val body = jsonBody.toRequestBody(jsonMediaType)
+            val httpRequest = Request.Builder()
+                .url(url)
+                .post(body)
+                .build()
+            val response = client.newCall(httpRequest).execute()
+            val responseBody = response.body?.string()
+                ?: return@withContext Result.failure(IOException("响应体为空"))
+            
+            if (!response.isSuccessful) {
+                val errorResponse = tryParseErrorResponse(responseBody, response.code)
+                return@withContext Result.failure(IOException(errorResponse))
+            }
+            
+            val checkinResponse = gson.fromJson(responseBody, CheckinResponse::class.java)
+            Result.success(checkinResponse)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
+    suspend fun numberCheckin(session: String, rollcallId: Int, number: String): Result<CheckinResponse> = withContext(Dispatchers.IO) {
+        try {
+            val url = "https://xzcy.rycarl.cn/api/checkin/number"
+            val jsonBody = gson.toJson(NumberCheckinRequest(session, rollcallId, number))
+            val body = jsonBody.toRequestBody(jsonMediaType)
+            val httpRequest = Request.Builder()
+                .url(url)
+                .post(body)
+                .build()
+            val response = client.newCall(httpRequest).execute()
+            val responseBody = response.body?.string()
+                ?: return@withContext Result.failure(IOException("响应体为空"))
+            
+            if (!response.isSuccessful) {
+                val errorResponse = tryParseErrorResponse(responseBody, response.code)
+                return@withContext Result.failure(IOException(errorResponse))
+            }
+            
+            val checkinResponse = gson.fromJson(responseBody, CheckinResponse::class.java)
+            Result.success(checkinResponse)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
+    suspend fun radarCheckin(request: RadarCheckinRequest): Result<CheckinResponse> = withContext(Dispatchers.IO) {
+        try {
+            val url = "https://xzcy.rycarl.cn/api/checkin/radar"
+            val jsonBody = gson.toJson(request)
+            val body = jsonBody.toRequestBody(jsonMediaType)
+            val httpRequest = Request.Builder()
+                .url(url)
+                .post(body)
+                .build()
+            val response = client.newCall(httpRequest).execute()
+            val responseBody = response.body?.string()
+                ?: return@withContext Result.failure(IOException("响应体为空"))
+            
+            if (!response.isSuccessful) {
+                val errorResponse = tryParseErrorResponse(responseBody, response.code)
+                return@withContext Result.failure(IOException(errorResponse))
+            }
+            
+            val checkinResponse = gson.fromJson(responseBody, CheckinResponse::class.java)
+            Result.success(checkinResponse)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
+    private fun tryParseErrorResponse(responseBody: String, code: Int): String {
+        return try {
+            val errorResponse = gson.fromJson(responseBody, ErrorResponse::class.java)
+            errorResponse.message ?: "请求失败: $code"
+        } catch (e: Exception) {
+            "请求失败: $code"
         }
     }
 }
