@@ -4,9 +4,12 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.widget.SeekBar
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.core.Camera
+import androidx.camera.core.CameraControl
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
@@ -23,12 +26,19 @@ import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import androidx.camera.core.ImageProxy
+import androidx.camera.core.ZoomState
+import java.util.concurrent.atomic.AtomicBoolean
 
 class QrScannerActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityQrScannerBinding
     private lateinit var cameraProviderFuture: ListenableFuture<ProcessCameraProvider>
     private lateinit var cameraExecutor: ExecutorService
+    private var camera: Camera? = null
+    private var cameraControl: CameraControl? = null
+    private var maxZoomRatio: Float = 1.0f
+    private var minZoomRatio: Float = 1.0f
+    private val isProcessing = AtomicBoolean(false)
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -50,6 +60,8 @@ class QrScannerActivity : AppCompatActivity() {
             finish()
         }
 
+        setupZoomControls()
+
         cameraExecutor = Executors.newSingleThreadExecutor()
 
         if (allPermissionsGranted()) {
@@ -63,6 +75,65 @@ class QrScannerActivity : AppCompatActivity() {
         return ContextCompat.checkSelfPermission(
             this, Manifest.permission.CAMERA
         ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun setupZoomControls() {
+        binding.btnZoomIn.setOnClickListener {
+            zoomIn()
+        }
+
+        binding.btnZoomOut.setOnClickListener {
+            zoomOut()
+        }
+
+        binding.seekBarZoom.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (fromUser) {
+                    setZoom(progress)
+                }
+            }
+
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+    }
+
+    private fun zoomIn() {
+        camera?.let { cam ->
+            val currentZoom = cam.cameraInfo.zoomState.value?.zoomRatio ?: 1.0f
+            val newZoom = (currentZoom + 0.5f).coerceAtMost(maxZoomRatio)
+            cameraControl?.setZoomRatio(newZoom)
+            updateZoomUI(newZoom)
+        }
+    }
+
+    private fun zoomOut() {
+        camera?.let { cam ->
+            val currentZoom = cam.cameraInfo.zoomState.value?.zoomRatio ?: 1.0f
+            val newZoom = (currentZoom - 0.5f).coerceAtLeast(minZoomRatio)
+            cameraControl?.setZoomRatio(newZoom)
+            updateZoomUI(newZoom)
+        }
+    }
+
+    private fun setZoom(progress: Int) {
+        if (maxZoomRatio <= minZoomRatio) return
+        
+        val zoomRange = maxZoomRatio - minZoomRatio
+        val zoomRatio = minZoomRatio + (zoomRange * progress / 100f)
+        cameraControl?.setZoomRatio(zoomRatio)
+        updateZoomUI(zoomRatio)
+    }
+
+    private fun updateZoomUI(zoomRatio: Float) {
+        binding.tvZoomLevel.text = String.format("缩放: %.1fx", zoomRatio)
+        binding.tvZoomLevel.visibility = android.view.View.VISIBLE
+        
+        if (maxZoomRatio > minZoomRatio) {
+            val progress = ((zoomRatio - minZoomRatio) / (maxZoomRatio - minZoomRatio) * 100).toInt()
+            binding.seekBarZoom.setProgress(progress)
+        }
     }
 
     private fun startCamera() {
@@ -89,18 +160,45 @@ class QrScannerActivity : AppCompatActivity() {
 
             try {
                 cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(
+                camera = cameraProvider.bindToLifecycle(
                     this, cameraSelector, preview, imageAnalyzer
                 )
+                cameraControl = camera?.cameraControl
+                
+                setupZoomObserver()
             } catch (e: Exception) {
                 Log.e("QrScannerActivity", "绑定相机失败", e)
             }
         }, ContextCompat.getMainExecutor(this))
     }
 
+    private fun setupZoomObserver() {
+        camera?.cameraInfo?.zoomState?.observe(this) { zoomState ->
+            maxZoomRatio = zoomState.maxZoomRatio
+            minZoomRatio = zoomState.minZoomRatio
+            
+            if (maxZoomRatio > minZoomRatio) {
+                binding.seekBarZoom.isEnabled = true
+                binding.btnZoomIn.isEnabled = true
+                binding.btnZoomOut.isEnabled = true
+            } else {
+                binding.seekBarZoom.isEnabled = false
+                binding.btnZoomIn.isEnabled = false
+                binding.btnZoomOut.isEnabled = false
+            }
+        }
+    }
+
     private fun processImageProxy(imageProxy: ImageProxy) {
+        if (isProcessing.get()) {
+            imageProxy.close()
+            return
+        }
+
         val mediaImage = imageProxy.image
         if (mediaImage != null) {
+            isProcessing.set(true)
+            
             val inputImage = InputImage.fromMediaImage(
                 mediaImage,
                 imageProxy.imageInfo.rotationDegrees
@@ -109,12 +207,18 @@ class QrScannerActivity : AppCompatActivity() {
             val scanner = BarcodeScanning.getClient()
             scanner.process(inputImage)
                 .addOnSuccessListener { barcodes ->
-                    for (barcode in barcodes) {
-                        handleBarcode(barcode)
+                    if (barcodes.isNotEmpty()) {
+                        for (barcode in barcodes) {
+                            handleBarcode(barcode)
+                            break
+                        }
+                    } else {
+                        isProcessing.set(false)
                     }
                 }
                 .addOnFailureListener { e ->
                     Log.e("QrScannerActivity", "条码扫描失败", e)
+                    isProcessing.set(false)
                 }
                 .addOnCompleteListener {
                     imageProxy.close()
@@ -133,6 +237,8 @@ class QrScannerActivity : AppCompatActivity() {
                 setResult(RESULT_OK, resultIntent)
                 finish()
             }
+        } else {
+            isProcessing.set(false)
         }
     }
 

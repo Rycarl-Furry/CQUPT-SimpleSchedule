@@ -248,6 +248,7 @@ class SettingsFragment : Fragment() {
         dialogBinding.btnLogin.setOnClickListener {
             val uid = dialogBinding.etUid.text.toString().trim()
             val password = dialogBinding.etPassword.text.toString().trim()
+            val autoLogin = dialogBinding.cbAutoLogin.isChecked
             
             if (uid.isEmpty()) {
                 Toast.makeText(requireContext(), "请输入统一认证码", Toast.LENGTH_SHORT).show()
@@ -259,15 +260,16 @@ class SettingsFragment : Fragment() {
                 return@setOnClickListener
             }
             
-            performXzcyLogin(uid, password, dialog, dialogBinding)
+            performXzcyLogin(uid, password, autoLogin, dialog, dialogBinding)
         }
         
         dialog.show()
     }
 
-    private fun performXzcyLogin(
+     private fun performXzcyLogin(
         uid: String, 
-        password: String, 
+        password: String,
+        autoLogin: Boolean,
         dialog: android.app.Dialog,
         dialogBinding: DialogXzcyLoginBinding
     ) {
@@ -284,6 +286,9 @@ class SettingsFragment : Fragment() {
                 onSuccess = { response ->
                     if (response.success) {
                         cache.saveXzcySession(response.session ?: "")
+                        if (autoLogin) {
+                            cache.saveXzcyAutoLoginCredentials(uid, password)
+                        }
                         dialog.dismiss()
                         updateXzcyStatus()
                         Toast.makeText(requireContext(), "登录成功", Toast.LENGTH_SHORT).show()

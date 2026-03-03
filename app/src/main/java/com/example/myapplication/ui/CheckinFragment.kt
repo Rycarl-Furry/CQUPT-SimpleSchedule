@@ -101,10 +101,6 @@ class CheckinFragment : Fragment() {
     }
 
     private fun setupClickListeners() {
-        binding.btnBack.setOnClickListener {
-            parentFragmentManager.popBackStack()
-        }
-
         binding.btnGoToSettings.setOnClickListener {
             (activity as? MainActivity)?.navigateToSettings()
         }

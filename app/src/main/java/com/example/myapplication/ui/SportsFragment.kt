@@ -89,18 +89,22 @@ class SportsFragment : Fragment() {
     }
 
     private fun displayRecords(records: List<SportsRecord>, totalCount: Int) {
+        var validTotalCount = 0
         var runCount = 0
         var otherCount = 0
         
         records.forEach { record ->
-            if (record.sportsType == "1") {
-                runCount++
-            } else {
-                otherCount++
+            if (record.isValid == "1") {
+                validTotalCount++
+                if (record.sportsType == "1") {
+                    runCount++
+                } else {
+                    otherCount++
+                }
             }
         }
         
-        binding.tvTotalCount.text = totalCount.toString()
+        binding.tvTotalCount.text = validTotalCount.toString()
         binding.tvRunCount.text = runCount.toString()
         binding.tvOtherCount.text = otherCount.toString()
         

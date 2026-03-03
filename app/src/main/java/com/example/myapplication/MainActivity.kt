@@ -69,6 +69,7 @@ class MainActivity : AppCompatActivity() {
                 Handler(Looper.getMainLooper()).post {
                     refreshInBackground(studentId!!)
                     performAutoIdsLogin()
+                    performAutoXzcyLogin()
                     checkPermissions()
                     WidgetUpdater.updateAllWidgets(this@MainActivity)
                 }
@@ -119,6 +120,27 @@ class MainActivity : AppCompatActivity() {
                     result.fold(
                         onSuccess = { response ->
                             cache.saveAccessToken(response.access_token)
+                        },
+                        onFailure = { }
+                    )
+                }
+            }
+        }
+    }
+
+    private fun performAutoXzcyLogin() {
+        if (cache.isXzcyAutoLoginEnabled()) {
+            val credentials = cache.getXzcyAutoLoginCredentials()
+            if (credentials != null) {
+                lifecycleScope.launch {
+                    val result = networkService.xzcyLogin(
+                        com.example.myapplication.model.XzcyLoginRequest(credentials.first, credentials.second)
+                    )
+                    result.fold(
+                        onSuccess = { response ->
+                            if (response.success) {
+                                cache.saveXzcySession(response.session ?: "")
+                            }
                         },
                         onFailure = { }
                     )

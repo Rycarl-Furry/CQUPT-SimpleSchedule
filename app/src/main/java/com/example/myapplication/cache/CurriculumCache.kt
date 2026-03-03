@@ -191,4 +191,39 @@ class CurriculumCache(private val context: Context) {
             .remove("xzcy_session")
             .apply()
     }
+    
+    fun saveXzcyAutoLoginCredentials(uid: String, password: String) {
+        prefs.edit()
+            .putString("xzcy_uid", uid)
+            .putString("xzcy_password", password)
+            .putBoolean("xzcy_auto_login_enabled", true)
+            .apply()
+    }
+    
+    fun getXzcyAutoLoginCredentials(): Pair<String, String>? {
+        val uid = prefs.getString("xzcy_uid", null) ?: return null
+        val password = prefs.getString("xzcy_password", null) ?: return null
+        return Pair(uid, password)
+    }
+    
+    fun isXzcyAutoLoginEnabled(): Boolean {
+        return prefs.getBoolean("xzcy_auto_login_enabled", false)
+    }
+    
+    fun disableXzcyAutoLogin() {
+        prefs.edit()
+            .remove("xzcy_uid")
+            .remove("xzcy_password")
+            .putBoolean("xzcy_auto_login_enabled", false)
+            .apply()
+    }
+    
+    fun clearXzcyCredentials() {
+        prefs.edit()
+            .remove("xzcy_session")
+            .remove("xzcy_uid")
+            .remove("xzcy_password")
+            .putBoolean("xzcy_auto_login_enabled", false)
+            .apply()
+    }
 }
